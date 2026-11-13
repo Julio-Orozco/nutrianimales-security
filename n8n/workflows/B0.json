@@ -1,0 +1,74 @@
+{
+  "name": "Nutri B0 — Bot Telegram por polling",
+  "nodes": [
+    {
+      "id": "ed7eea0b-ab5e-593f-af0f-04a0001e2187",
+      "name": "Cada 15 segundos",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "seconds",
+              "secondsInterval": 15
+            }
+          ]
+        }
+      },
+      "position": [
+        0,
+        0
+      ],
+      "notes": "Consulta Telegram por salida HTTPS. No usa Telegram Trigger ni necesita URL pública.",
+      "notesInFlow": true
+    },
+    {
+      "id": "dad18ea6-291e-5b2d-a9f1-1a45f3f8e29b",
+      "name": "Recibir y responder bot",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "parameters": {
+        "method": "POST",
+        "url": "http://monitor:8000/bot/poll",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "position": [
+        300,
+        0
+      ],
+      "notes": "Invoca una operación fija del monitor. La credencial se importa cifrada en n8n, nunca en este JSON. Reintenta fallos transitorios; la bandeja evita duplicados normales.",
+      "notesInFlow": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REEMPLAZAR_AL_IMPORTAR",
+          "name": "Nutri monitor"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    }
+  ],
+  "connections": {
+    "Cada 15 segundos": {
+      "main": [
+        [
+          {
+            "node": "Recibir y responder bot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Costa_Rica"
+  }
+}

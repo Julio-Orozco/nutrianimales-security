@@ -1,0 +1,186 @@
+{
+  "name": "Nutri R4 — Autenticaciones fallidas",
+  "nodes": [
+    {
+      "id": "706f72d5-9567-5165-80bd-37728d69ba44",
+      "name": "Cada 30 segundos",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "seconds",
+              "secondsInterval": 30
+            }
+          ]
+        }
+      },
+      "position": [
+        0,
+        0
+      ],
+      "notes": "Agenda de la regla R4. Sondeo periódico, no detección instantánea garantizada.",
+      "notesInFlow": true
+    },
+    {
+      "id": "aeae0485-6434-5f0f-a245-bfbb493c5c1f",
+      "name": "Prueba manual",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "parameters": {},
+      "position": [
+        0,
+        240
+      ],
+      "notes": "Permite ejecutar esta misma regla desde el editor durante QA.",
+      "notesInFlow": true
+    },
+    {
+      "id": "1278913b-ac58-53a1-a232-0c5c4e9bacee",
+      "name": "Detectar R4",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "parameters": {
+        "method": "POST",
+        "url": "http://monitor:8000/checks/R4",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "position": [
+        260,
+        0
+      ],
+      "notes": "Autenticaciones fallidas. Fuente: JSON PostgreSQL + ssh.log. Condición: Más de 5 fallos en 10 minutos, PG o SSH. Devuelve evidencia real o un error de fuente no disponible.",
+      "notesInFlow": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REEMPLAZAR_AL_IMPORTAR",
+          "name": "Nutri monitor"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "id": "e96865c4-d51e-5aa4-8884-d003cf263483",
+      "name": "Hay hallazgo",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "R4",
+              "leftValue": "={{ $json.detected }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "position": [
+        520,
+        0
+      ],
+      "notes": "Solo la rama verdadera solicita notificación. Sin hallazgo no se envía Telegram.",
+      "notesInFlow": true
+    },
+    {
+      "id": "f4d000ba-e2cd-5e2b-a5cb-7b6bae16ea3e",
+      "name": "Notificar R4",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "parameters": {
+        "method": "POST",
+        "url": "=http://monitor:8000/notify/{{ $json.event_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "position": [
+        800,
+        0
+      ],
+      "notes": "Invoca una operación fija del monitor. La credencial se importa cifrada en n8n, nunca en este JSON. Reintenta fallos transitorios; la bandeja evita duplicados normales.",
+      "notesInFlow": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REEMPLAZAR_AL_IMPORTAR",
+          "name": "Nutri monitor"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    }
+  ],
+  "connections": {
+    "Cada 30 segundos": {
+      "main": [
+        [
+          {
+            "node": "Detectar R4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prueba manual": {
+      "main": [
+        [
+          {
+            "node": "Detectar R4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detectar R4": {
+      "main": [
+        [
+          {
+            "node": "Hay hallazgo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hay hallazgo": {
+      "main": [
+        [
+          {
+            "node": "Notificar R4",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Costa_Rica"
+  }
+}

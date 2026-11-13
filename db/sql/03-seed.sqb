@@ -1,0 +1,33 @@
+-- Datos deterministas y ficticios. ON CONFLICT permite recuperar filas eliminadas.
+INSERT INTO plantas SELECT n, 'Planta '||n, 'Valle Central', 10000*n, 'activa'
+FROM generate_series(1,3) n ON CONFLICT DO NOTHING;
+INSERT INTO productos SELECT n, 'PROD-'||n, 'Alimento '||n,
+ (ARRAY['aves','cerdos','ganado','peces'])[1+(n%4)], 1000+n*10, true
+FROM generate_series(1,50) n ON CONFLICT DO NOTHING;
+INSERT INTO materias_primas SELECT n, 'Materia '||n,
+ (ARRAY['grano','mineral','proteina'])[1+(n%3)], 1000+n, 100, 'Proveedor ficticio '||(n%10)
+FROM generate_series(1,100) n ON CONFLICT DO NOTHING;
+INSERT INTO lotes_produccion SELECT n, 'LOTE-'||n, 1+(n%3), 1+(n%50),
+ 500+n, now()-(n||' hours')::interval, 'activo'
+FROM generate_series(1,500) n ON CONFLICT DO NOTHING;
+-- 1.500 supera >1.000 en D7; el mínimo de 200 de la guía no lo haría.
+INSERT INTO clientes SELECT n, 'Cliente ficticio '||n, 'distribuidor',
+ 'cliente'||n||'@example.invalid', 'segmento-'||(n%4)
+FROM generate_series(1,1500) n ON CONFLICT DO NOTHING;
+INSERT INTO ventas SELECT n, 1+(n%1500), 1+(n%50), 10+(n%100),
+ 10000+n*50, now()-(n||' minutes')::interval, 'completada'
+FROM generate_series(1,1500) n ON CONFLICT DO NOTHING;
+INSERT INTO control_calidad SELECT n, n, 'humedad', 10, 12, true
+FROM generate_series(1,300) n ON CONFLICT DO NOTHING;
+INSERT INTO gastos SELECT n, 'operacion', 'Gasto ficticio '||n, 1000+n,
+ now()-(n||' days')::interval, 'TI ficticio'
+FROM generate_series(1,200) n ON CONFLICT DO NOTHING;
+-- Ajustar secuencias: los INSERT posteriores sin id no deben colisionar con la semilla.
+SELECT setval(pg_get_serial_sequence('plantas','id'),(SELECT max(id) FROM plantas));
+SELECT setval(pg_get_serial_sequence('productos','id'),(SELECT max(id) FROM productos));
+SELECT setval(pg_get_serial_sequence('materias_primas','id'),(SELECT max(id) FROM materias_primas));
+SELECT setval(pg_get_serial_sequence('lotes_produccion','id'),(SELECT max(id) FROM lotes_produccion));
+SELECT setval(pg_get_serial_sequence('clientes','id'),(SELECT max(id) FROM clientes));
+SELECT setval(pg_get_serial_sequence('ventas','id'),(SELECT max(id) FROM ventas));
+SELECT setval(pg_get_serial_sequence('control_calidad','id'),(SELECT max(id) FROM control_calidad));
+SELECT setval(pg_get_serial_sequence('gastos','id'),(SELECT max(id) FROM gastos));

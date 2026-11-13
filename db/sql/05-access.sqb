@@ -1,0 +1,13 @@
+-- El gerente accede a reportes agregados: se corrige la contradicción de la guía.
+GRANT SELECT ON reporte_ventas,reporte_inventario,reporte_produccion TO rol_gerente,agente_ia;
+GRANT SELECT ON plantas,productos,materias_primas,lotes_produccion,ventas,clientes,control_calidad,gastos TO agente_ia;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO rol_ti,monitor_db;
+GRANT INSERT ON backups,alertas_auditoria TO rol_ti;
+GRANT SELECT ON auditoria_datos,auditoria_sentencias,eventos_seguridad,backups,alertas_auditoria,pg_settings_baseline TO rol_auditor;
+GRANT INSERT,UPDATE ON alertas_auditoria TO monitor_db;
+GRANT INSERT ON backups TO backup_db;
+GRANT INSERT ON auditoria_datos,auditoria_sentencias,eventos_seguridad TO audit_owner;
+GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO audit_owner,rol_ti,monitor_db,backup_db;
+-- No se concede UPDATE/DELETE sobre auditoría ni a TI ni a monitor_db.
+REVOKE ALL ON auditoria_datos,auditoria_sentencias,eventos_seguridad FROM agente_ia,rol_gerente;
+ALTER DEFAULT PRIVILEGES REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;

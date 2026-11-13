@@ -1,0 +1,186 @@
+{
+  "name": "Nutri D2 — Crecimiento anormal",
+  "nodes": [
+    {
+      "id": "706f72d5-9567-5165-80bd-37728d69ba44",
+      "name": "Cada 30 segundos",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "seconds",
+              "secondsInterval": 30
+            }
+          ]
+        }
+      },
+      "position": [
+        0,
+        0
+      ],
+      "notes": "Agenda de la regla D2. Sondeo periódico, no detección instantánea garantizada.",
+      "notesInFlow": true
+    },
+    {
+      "id": "aeae0485-6434-5f0f-a245-bfbb493c5c1f",
+      "name": "Prueba manual",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "parameters": {},
+      "position": [
+        0,
+        240
+      ],
+      "notes": "Permite ejecutar esta misma regla desde el editor durante QA.",
+      "notesInFlow": true
+    },
+    {
+      "id": "b05bccb3-3a7f-5336-af8d-9199f03e09a5",
+      "name": "Detectar D2",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "parameters": {
+        "method": "POST",
+        "url": "http://monitor:8000/checks/D2",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "position": [
+        260,
+        0
+      ],
+      "notes": "Crecimiento anormal. Fuente: Conteos exactos + historial. Condición: Más de 20% dentro de ventana de 30 minutos. Devuelve evidencia real o un error de fuente no disponible.",
+      "notesInFlow": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REEMPLAZAR_AL_IMPORTAR",
+          "name": "Nutri monitor"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "id": "e96865c4-d51e-5aa4-8884-d003cf263483",
+      "name": "Hay hallazgo",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "D2",
+              "leftValue": "={{ $json.detected }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "position": [
+        520,
+        0
+      ],
+      "notes": "Solo la rama verdadera solicita notificación. Sin hallazgo no se envía Telegram.",
+      "notesInFlow": true
+    },
+    {
+      "id": "ad81e215-918f-572f-b95f-631283261601",
+      "name": "Notificar D2",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "parameters": {
+        "method": "POST",
+        "url": "=http://monitor:8000/notify/{{ $json.event_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "position": [
+        800,
+        0
+      ],
+      "notes": "Invoca una operación fija del monitor. La credencial se importa cifrada en n8n, nunca en este JSON. Reintenta fallos transitorios; la bandeja evita duplicados normales.",
+      "notesInFlow": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REEMPLAZAR_AL_IMPORTAR",
+          "name": "Nutri monitor"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    }
+  ],
+  "connections": {
+    "Cada 30 segundos": {
+      "main": [
+        [
+          {
+            "node": "Detectar D2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prueba manual": {
+      "main": [
+        [
+          {
+            "node": "Detectar D2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detectar D2": {
+      "main": [
+        [
+          {
+            "node": "Hay hallazgo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hay hallazgo": {
+      "main": [
+        [
+          {
+            "node": "Notificar D2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Costa_Rica"
+  }
+}

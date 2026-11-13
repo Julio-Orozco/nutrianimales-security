@@ -1,0 +1,24 @@
+-- No registrar las instrucciones que establecen contraseñas.
+SET log_statement = 'none';
+SET log_min_duration_statement = -1;
+CREATE ROLE rol_gerente NOLOGIN;
+CREATE ROLE rol_ti NOLOGIN;
+CREATE ROLE rol_auditor NOLOGIN;
+CREATE ROLE audit_owner NOLOGIN;
+CREATE USER gerente_db PASSWORD :'gerente_password' IN ROLE rol_gerente;
+CREATE USER ti_db PASSWORD :'ti_password' IN ROLE rol_ti;
+CREATE USER auditor_db PASSWORD :'auditor_password' IN ROLE rol_auditor;
+CREATE USER agente_ia PASSWORD :'agente_password';
+CREATE USER monitor_db PASSWORD :'monitor_password';
+CREATE USER backup_db PASSWORD :'backup_password';
+-- Las cuentas de aplicación no crean objetos ni heredan permisos administrativos.
+REVOKE ALL ON DATABASE nutrianimales FROM PUBLIC;
+GRANT CONNECT ON DATABASE nutrianimales TO rol_gerente, rol_ti, rol_auditor, agente_ia, monitor_db, backup_db;
+REVOKE CREATE ON SCHEMA public FROM PUBLIC;
+GRANT USAGE ON SCHEMA public TO rol_gerente, rol_ti, rol_auditor, agente_ia, monitor_db, backup_db, audit_owner;
+GRANT pg_monitor TO monitor_db, rol_auditor;
+-- pg_dump necesita leer todas las tablas, no modificar su contenido.
+GRANT pg_read_all_data TO backup_db;
+ALTER ROLE agente_ia SET default_transaction_read_only = on;
+ALTER ROLE agente_ia SET statement_timeout = '5s';
+ALTER ROLE agente_ia SET lock_timeout = '2s';

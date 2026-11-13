@@ -1,0 +1,186 @@
+{
+  "name": "Nutri H5 — Autenticación o TLS degradados",
+  "nodes": [
+    {
+      "id": "706f72d5-9567-5165-80bd-37728d69ba44",
+      "name": "Cada 30 segundos",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "seconds",
+              "secondsInterval": 30
+            }
+          ]
+        }
+      },
+      "position": [
+        0,
+        0
+      ],
+      "notes": "Agenda de la regla H5. Sondeo periódico, no detección instantánea garantizada.",
+      "notesInFlow": true
+    },
+    {
+      "id": "aeae0485-6434-5f0f-a245-bfbb493c5c1f",
+      "name": "Prueba manual",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "parameters": {},
+      "position": [
+        0,
+        240
+      ],
+      "notes": "Permite ejecutar esta misma regla desde el editor durante QA.",
+      "notesInFlow": true
+    },
+    {
+      "id": "006d388a-764a-5b07-b6c0-ad6c4367c90f",
+      "name": "Detectar H5",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "parameters": {
+        "method": "POST",
+        "url": "http://monitor:8000/checks/H5",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "position": [
+        260,
+        0
+      ],
+      "notes": "Autenticación o TLS degradados. Fuente: pg_settings + HBA efectivo. Condición: SSL off, cifrado distinto de SCRAM o regla MD5. Devuelve evidencia real o un error de fuente no disponible.",
+      "notesInFlow": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REEMPLAZAR_AL_IMPORTAR",
+          "name": "Nutri monitor"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "id": "e96865c4-d51e-5aa4-8884-d003cf263483",
+      "name": "Hay hallazgo",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "H5",
+              "leftValue": "={{ $json.detected }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "position": [
+        520,
+        0
+      ],
+      "notes": "Solo la rama verdadera solicita notificación. Sin hallazgo no se envía Telegram.",
+      "notesInFlow": true
+    },
+    {
+      "id": "635495db-d80f-5dc9-8bbf-7c92bafe4047",
+      "name": "Notificar H5",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "parameters": {
+        "method": "POST",
+        "url": "=http://monitor:8000/notify/{{ $json.event_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "position": [
+        800,
+        0
+      ],
+      "notes": "Invoca una operación fija del monitor. La credencial se importa cifrada en n8n, nunca en este JSON. Reintenta fallos transitorios; la bandeja evita duplicados normales.",
+      "notesInFlow": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REEMPLAZAR_AL_IMPORTAR",
+          "name": "Nutri monitor"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    }
+  ],
+  "connections": {
+    "Cada 30 segundos": {
+      "main": [
+        [
+          {
+            "node": "Detectar H5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prueba manual": {
+      "main": [
+        [
+          {
+            "node": "Detectar H5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detectar H5": {
+      "main": [
+        [
+          {
+            "node": "Hay hallazgo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hay hallazgo": {
+      "main": [
+        [
+          {
+            "node": "Notificar H5",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Costa_Rica"
+  }
+}

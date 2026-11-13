@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NutriAnimales · Auditoría de solo lectura</title>
+<style>body{font:16px system-ui;max-width:1000px;margin:40px auto;padding:20px;background:#f4f6f8;color:#142536}input,button{padding:12px;margin:8px 0}pre{white-space:pre-wrap;background:white;padding:20px;border:1px solid #ccd6df}small{display:block}</style>
+<h1>Auditoría de NutriAnimales</h1>
+<p>Panel alternativo de solo lectura. No es el rol Viewer nativo de n8n.</p>
+<label>Clave de auditor <input id="token" type="password" autocomplete="off"></label>
+<button id="consultar">Consultar eventos</button>
+<small>La clave permanece en memoria de esta página; no se guarda en el navegador.</small>
+<pre id="salida">Sin consultar. Un evento dry-run no acredita un envío a Telegram.</pre>
+<script>
+// textContent muestra los datos como texto: no interpreta HTML procedente de eventos.
+document.getElementById('consultar').addEventListener('click',async()=>{
+ const output=document.getElementById('salida');
+ try{
+  const response=await fetch('/monitor/events',{headers:{'X-Auditor-Key':document.getElementById('token').value}});
+  if(!response.ok)throw new Error('Acceso rechazado: HTTP '+response.status);
+  output.textContent=JSON.stringify(await response.json(),null,2);
+ }catch(error){output.textContent=error.message;}
+});
+</script></html>

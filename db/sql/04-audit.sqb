@@ -1,0 +1,74 @@
+-- SECURITY DEFINER permite auditar sin conceder escritura directa a usuarios.
+CREATE FUNCTION fn_auditoria() RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+DECLARE anterior jsonb; nuevo jsonb;
+BEGIN
+  IF TG_OP <> 'INSERT' THEN anterior := to_jsonb(OLD); END IF;
+  IF TG_OP <> 'DELETE' THEN nuevo := to_jsonb(NEW); END IF;
+  INSERT INTO public.auditoria_datos
+   (tabla,operacion,usuario,ip_cliente,fila_id,valor_antes,valor_nuevo,transaccion)
+  VALUES (TG_TABLE_NAME,TG_OP,session_user,inet_client_addr(),
+   coalesce((nuevo->>'id')::integer,(anterior->>'id')::integer),anterior,nuevo,txid_current());
+  IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
+  RETURN NEW;
+END $$;
+ALTER FUNCTION fn_auditoria() OWNER TO audit_owner;
+REVOKE ALL ON FUNCTION fn_auditoria() FROM PUBLIC;
+CREATE FUNCTION fn_auditoria_sentencia() RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+DECLARE cantidad bigint;
+BEGIN
+  IF TG_OP = 'DELETE' THEN SELECT count(*) INTO cantidad FROM old_rows;
+  ELSE SELECT count(*) INTO cantidad FROM new_rows; END IF;
+  INSERT INTO public.auditoria_sentencias(tabla,operacion,usuario,filas,consulta)
+  VALUES (TG_TABLE_NAME,TG_OP,session_user,cantidad,current_query());
+  RETURN NULL;
+END $$;
+ALTER FUNCTION fn_auditoria_sentencia() OWNER TO audit_owner;
+REVOKE ALL ON FUNCTION fn_auditoria_sentencia() FROM PUBLIC;
+-- Identificadores proceden de una lista fija, no de solicitudes del bot.
+DO $$
+DECLARE t text;
+BEGIN
+ FOREACH t IN ARRAY ARRAY['lotes_produccion','ventas','clientes','productos'] LOOP
+  EXECUTE format('CREATE TRIGGER trg_auditoria_%I AFTER INSERT OR UPDATE OR DELETE ON %I FOR EACH ROW EXECUTE FUNCTION fn_auditoria()',t,t);
+  EXECUTE format('CREATE TRIGGER trg_sentencia_delete AFTER DELETE ON %I REFERENCING OLD TABLE AS old_rows FOR EACH STATEMENT EXECUTE FUNCTION fn_auditoria_sentencia()',t);
+  EXECUTE format('CREATE TRIGGER trg_sentencia_update AFTER UPDATE ON %I REFERENCING NEW TABLE AS new_rows FOR EACH STATEMENT EXECUTE FUNCTION fn_auditoria_sentencia()',t);
+ END LOOP;
+END $$;
+-- Solo devuelve metadatos y hashes de tres archivos concretos, nunca claves TLS.
+CREATE FUNCTION security_snapshot() RETURNS jsonb
+LANGUAGE sql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+ SELECT jsonb_build_object(
+ 'hashes', jsonb_build_object(
+   'postgresql.conf',encode(sha256(pg_read_binary_file(current_setting('config_file'))),'hex'),
+   'pg_hba.conf',encode(sha256(pg_read_binary_file(current_setting('hba_file'))),'hex'),
+   'postgresql.auto.conf',encode(sha256(pg_read_binary_file('postgresql.auto.conf',0,100000,true)),'hex')),
+ 'hba_md5',EXISTS(SELECT 1 FROM pg_hba_file_rules WHERE auth_method='md5'),
+ 'privilegios_agente',jsonb_build_object(
+   'superuser',(SELECT rolsuper FROM pg_roles WHERE rolname='agente_ia'),
+   'createrole',(SELECT rolcreaterole FROM pg_roles WHERE rolname='agente_ia'),
+   'createdb',(SELECT rolcreatedb FROM pg_roles WHERE rolname='agente_ia'),
+   'create_schema',has_schema_privilege('agente_ia','public','CREATE'),
+   'escritura',(SELECT coalesce(jsonb_agg(c.relname),'[]'::jsonb) FROM pg_class c
+      JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind='r'
+      AND has_table_privilege('agente_ia',c.oid,'INSERT,UPDATE,DELETE,TRUNCATE,TRIGGER,REFERENCES'))))
+$$;
+REVOKE ALL ON FUNCTION security_snapshot() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION security_snapshot() TO monitor_db;
+-- Un evento de autenticación o bloqueo no es una modificación de una fila empresarial.
+-- Esta función registra ambos tipos explícitamente, sin inventar un trigger SELECT.
+CREATE FUNCTION registrar_evento(fuente text,tipo text,detalle jsonb,huella text,fecha timestamptz)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+DECLARE nuevo_id bigint;
+BEGIN
+ INSERT INTO public.eventos_seguridad(fuente,tipo,detalle,huella,fecha)
+ VALUES ($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING RETURNING id INTO nuevo_id;
+ IF nuevo_id IS NOT NULL THEN
+  INSERT INTO public.auditoria_datos(tabla,operacion,usuario,valor_nuevo,transaccion)
+  VALUES ('evento:'||$1,$2,session_user,$3,txid_current());
+ END IF;
+END $$;
+ALTER FUNCTION registrar_evento(text,text,jsonb,text,timestamptz) OWNER TO audit_owner;
+REVOKE ALL ON FUNCTION registrar_evento(text,text,jsonb,text,timestamptz) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION registrar_evento(text,text,jsonb,text,timestamptz) TO monitor_db;

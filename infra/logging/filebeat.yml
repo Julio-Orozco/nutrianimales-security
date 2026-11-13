@@ -1,0 +1,14 @@
+filebeat.inputs:
+  - type: filestream
+    id: ufw-logs
+    enabled: true
+    paths: 
+      - /var/log/ufw.log
+    fields: 
+      proyecto: nutrianimales
+    fields_under_root: true
+
+output.console:
+  pretty: true
+logging.level: warning
+setup.ilm.enabled: false
