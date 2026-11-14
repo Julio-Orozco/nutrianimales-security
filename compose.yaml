@@ -14,10 +14,14 @@ services:
       - AUDITOR_PASSWORD=${AUDITOR_PASSWORD}
       - BACKUP_PASSWORD=${BACKUP_PASSWORD}
       - POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256 --auth-local=trust
+    command: ["postgres", "-c", "config_file=/etc/postgresql/postgresql.conf"]
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./db/sql:/docker-entrypoint-initdb.d:ro
-      # NO montamos el postgresql.conf todavía. Lo haremos después.
+      - ./infra/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+      - ./infra/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
+      - ./infra/postgres-tls:/run/pg-tls:ro
+      - ./infra/postgres-logs:/var/log/postgresql
     networks:
       - nutrianimales-net
     healthcheck:
@@ -41,8 +45,14 @@ services:
       - DB_POSTGRESDB_USER=monitor_db
       - DB_POSTGRESDB_PASSWORD=${MONITOR_PASSWORD}
       - N8N_BLOCK_ENV_ACCESS_IN_NODE=true
+      - DB_POSTGRESDB_SSL_ENABLED=true
+      - DB_POSTGRESDB_SSL_CA_FILE=/run/pg-ca/server.crt
+      - DB_POSTGRESDB_SSL_REJECT_UNAUTHORIZED=true
+      - DB_POSTGRESDB_SCHEMA=n8n
+      - N8N_LOG_LEVEL=debug
     volumes:
       - n8n_data:/home/node/.n8n
+      - ./infra/postgres-tls/server.crt:/run/pg-ca/server.crt:ro
     networks:
       - nutrianimales-net
     user: "1000:1000"

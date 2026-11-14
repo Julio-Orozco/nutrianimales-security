@@ -1,3 +1,7 @@
 .env
 *.log
 db/data/
+
+infra/postgres-tls/
+infra/postgres-logs/
+*.antes-tls*
