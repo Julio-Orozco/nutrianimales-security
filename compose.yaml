@@ -6,13 +6,13 @@ services:
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_DB=nutrianimales
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - MONITOR_PASSWORD=${MONITOR_PASSWORD}
-      - AGENTE_IA_PASSWORD=${AGENTE_IA_PASSWORD}
-      - GERENTE_PASSWORD=${GERENTE_PASSWORD}
-      - TI_PASSWORD=${TI_PASSWORD}
-      - AUDITOR_PASSWORD=${AUDITOR_PASSWORD}
-      - BACKUP_PASSWORD=${BACKUP_PASSWORD}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      - MONITOR_PASSWORD=${MONITOR_PASSWORD:?Set MONITOR_PASSWORD in .env}
+      - AGENTE_IA_PASSWORD=${AGENTE_IA_PASSWORD:?Set AGENTE_IA_PASSWORD in .env}
+      - GERENTE_PASSWORD=${GERENTE_PASSWORD:?Set GERENTE_PASSWORD in .env}
+      - TI_PASSWORD=${TI_PASSWORD:?Set TI_PASSWORD in .env}
+      - AUDITOR_PASSWORD=${AUDITOR_PASSWORD:?Set AUDITOR_PASSWORD in .env}
+      - BACKUP_PASSWORD=${BACKUP_PASSWORD:?Set BACKUP_PASSWORD in .env}
       - POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256 --auth-local=trust
     command: ["postgres", "-c", "config_file=/etc/postgresql/postgresql.conf"]
     volumes:
@@ -38,12 +38,12 @@ services:
       - N8N_HOST=localhost
       - N8N_PORT=5678
       - N8N_PROTOCOL=http
-      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY:?Set N8N_ENCRYPTION_KEY in .env}
       - DB_TYPE=postgresdb
       - DB_POSTGRESDB_HOST=postgres
       - DB_POSTGRESDB_DATABASE=nutrianimales
       - DB_POSTGRESDB_USER=monitor_db
-      - DB_POSTGRESDB_PASSWORD=${MONITOR_PASSWORD}
+      - DB_POSTGRESDB_PASSWORD=${MONITOR_PASSWORD:?Set MONITOR_PASSWORD in .env}
       - N8N_BLOCK_ENV_ACCESS_IN_NODE=true
       - DB_POSTGRESDB_SSL_ENABLED=true
       - DB_POSTGRESDB_SSL_CA_FILE=/run/pg-ca/server.crt
@@ -65,8 +65,8 @@ services:
     container_name: nutrianimales_nginx
     restart: unless-stopped
     ports:
-      - "8080:8080"
-      - "8443:8443"
+      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:8443:8443"
     volumes:
       - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./infra/nginx/auditoria.html:/srv/auditoria.html:ro
@@ -82,25 +82,24 @@ services:
     container_name: nutrianimales_pgadmin
     restart: unless-stopped
     environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
-    ports:
-      - "5050:80"
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-ti@nutrianimales.test}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:?Set PGADMIN_DEFAULT_PASSWORD in .env}
     networks:
       - nutrianimales-net
-    user: "1000:1000"
 
   filebeat:
     image: docker.elastic.co/beats/filebeat:8.13.4
     container_name: nutrianimales_filebeat
     restart: unless-stopped
-    user: "root"
+    user: "1000:1000"
+    group_add:
+      - "4"
     volumes:
       - ./infra/logging/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
       - /var/log/ufw.log:/var/log/ufw.log:ro
     networks:
       - nutrianimales-net
-    command: filebeat -e -strict.perms=false
+    command: filebeat -e -strict.perms=false -E path.data=/tmp/filebeat
 
 networks:
   nutrianimales-net:

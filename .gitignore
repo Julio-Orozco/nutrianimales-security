@@ -2,6 +2,11 @@
 *.log
 db/data/
 
+.runtime/
+evidencias/*
+!evidencias/README.md
+!evidencias/RESULTADOS_AB.md
+infra/certs/server.key
 infra/postgres-tls/
 infra/postgres-logs/
 *.antes-tls*

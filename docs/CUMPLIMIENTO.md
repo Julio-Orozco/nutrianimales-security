@@ -1,50 +1,38 @@
-# Matriz de requisitos y evidencia pendiente
+# Matriz de cumplimiento de A y B
 
-«Implementado» significa que hay código/configuración, no que el grupo haya ejecutado el ensayo. Marcar aprobado únicamente con evidencia de su propia instalación. Fecha de preparación: 12 de noviembre de 2026.
+Estados basados en comandos ejecutados en esta instalación Docker el 14 de noviembre de 2026. La matriz no sustituye las capturas que debe tomar el equipo durante la exposición. Para comandos completos, ver `docs/COMANDOS.md`; salidas reales seleccionadas, `evidencias/RESULTADOS_AB.md`.
 
-## Doce puntos de hardening
+## Parte A — 12 controles de hardening
 
-| # | Implementación | Cómo demostrarla | Estado de evidencia del grupo |
+| # | Requisito / estado | Archivos relacionados | Comando de verificación | Resultado esperado | Resultado obtenido / evidencia |
+|---|---|---|---|---|---|
+| A1 | **Verificado**: servicios de aplicación sin root | `compose.yaml` | `docker compose exec -T <n8n\|nginx\|pgadmin\|filebeat> id`; inspección del proceso PostgreSQL | UID de proceso distinto de 0 en todos los servicios. | n8n 1000, Nginx 1000, pgAdmin 5050, Filebeat 1000 (grupo adm), PostgreSQL 999. E01. |
+| A2 | **Verificado**: protección del `.env` | `.gitignore`, `.env.example`, `scripts/prepare-ab.sh` | `stat -c '%a %n' .env`; `git check-ignore -v .env` | Modo 600; ignorado por Git; ejemplo sin secretos. | Modo 600 y Git lo ignora; el ejemplo contiene valores vacíos. Credenciales del `.env` preexistente no se rotaron. E02. |
+| A3 | **Verificado**: red de proyecto y comunicación autenticada | `compose.yaml`, `infra/pg_hba.conf` | Inspeccionar red real; agente_ia conecta a `postgres` con TLS `verify-full` | Servicios conectados a red bridge del proyecto; tráfico PostgreSQL solo con TLS/SCRAM; no afirmar `internal=true`. | Cinco contenedores en bridge `172.20.0.0/16`, `internal=false`; HBA usa `samenet`; agente_ia conecta cifrado. E03. |
+| A4 | **Verificado**: sin exposición directa innecesaria | `compose.yaml`, `infra/nginx/nginx.conf` | `docker compose ps` | Solo Nginx expone loopback 8080/8443; sin mapeo host de 5432, 5050, 5678. | Solo aparecen `127.0.0.1:8080/8443`; pgAdmin funciona por proxy y 5050 no está publicado. E04. |
+| A5 | **Verificado**: SCRAM efectivo | `infra/postgresql.conf`, `infra/pg_hba.conf`, `compose.yaml` | `SHOW password_encryption`; `pg_hba_file_rules`; intento con `sslmode=disable` | Password encryption SCRAM; host requiere TLS/SCRAM; sin TLS rechazado. | `scram-sha-256`; los siete roles tienen verificador SCRAM; conexión sin TLS rechazada. `local ... trust` se limita al socket del contenedor. E05. |
+| A6 | **Verificado**: TLS PostgreSQL funcional | `infra/postgresql.conf`, `infra/pg_hba.conf`, `compose.yaml` | `psql ... sslmode=verify-full`; `pg_stat_ssl` | Conexión cifrada, nombre/CA verificados y sesión reportada con `ssl=t`. | Agente_ia usó TLS 1.3 y certificado verificado por nombre. E06. |
+| A7 | **Verificado**: agente_ia de solo lectura | `db/sql/01-roles.sqb`, `db/sql/05-access.sqb` | SELECT y ensayos INSERT/UPDATE/DELETE autenticados como agente_ia; contar grants | SELECT permitido; las tres escrituras denegadas; cero grants de escritura. | SELECT devuelve 50 productos; INSERT/UPDATE/DELETE fallan por read-only; cero grants. E07. |
+| A8 | **Verificado**: headers web requeridos | `infra/nginx/nginx.conf` | `curl --cacert infra/certs/server.crt -I https://localhost:8443/auditoria.html` | Respuesta HTTPS 200 con X-Frame-Options, HSTS, X-Content-Type-Options y CSP. | HTTP 200 y los cuatro headers están presentes. E08. |
+| A9 | **Verificado**: certificado HTTPS válido para host de laboratorio | `infra/certs/server.crt`, `scripts/prepare-ab.sh` | `openssl verify -CAfile ... -verify_hostname localhost ...` | Certificado vigente, SAN localhost/IP y confianza explícita de CA autofirmada. | Verificación `OK`; SAN localhost/127.0.0.1. No equivale a confianza pública. E09. |
+| A10 | **Parcialmente verificado**: permisos de archivos y volúmenes | `.gitignore`, `scripts/prepare-ab.sh`, `compose.yaml` | `stat` de `.env`, claves y volúmenes PostgreSQL/n8n | `.env`/claves 600; PGDATA 700; datos propiedad del UID del servicio; montajes sensibles de solo lectura. | `.env` y claves 600; PGDATA 700 UID 999; n8n UID 1000. No se auditó cada archivo interno de todas las imágenes. E10. |
+| A11 | **Verificado**: log de consulta lenta y estadísticas | `infra/postgresql.conf`, `db/sql/02-schema.sqb` | Ejecutar `pg_sleep(1.1)`, buscar su log y consultar `pg_stat_statements` | Consulta >1.000 ms registrada y visible en estadísticas. | El log registró 1.144 s y `pg_stat_statements` contabilizó la consulta. E11. |
+| A12 | **Verificado**: baseline de siete parámetros | `db/sql/02-schema.sqb`, `infra/postgresql.conf` | Comparar `pg_settings_baseline` y `pg_settings` | Siete filas comparadas; todos los valores coinciden con la configuración aprobada. | Siete filas; las siete coinciden. E12. |
+
+## Parte B — base y auditoría
+
+| Requisito / estado | Resultado esperado | Comando / evidencia | Resultado real |
 |---|---|---|---|
-| 1 | n8n UID1000 y pgAdmin UID5050 | compose y proceso efectivo/UID. UID5050 es el usuario real de pgAdmin, no se fuerza 1000 sin considerar su imagen | Pendiente |
-| 2 | .env generado 600, ignorado por Git | `ls -l .env`; no abrir su contenido en capturas | Pendiente |
-| 3 | Red datos interna con CIDR definido | docker network inspect sobre el nombre real creado por Compose | Pendiente |
-| 4 | PostgreSQL sin ports | compose ps + inspección de PortBindings | Pendiente |
-| 5 | SCRAM en init, configuración y HBA | SHOW password_encryption; reglas HBA; conexión rechazada con clave falsa | Pendiente |
-| 6 | TLS PostgreSQL con verify-full en clientes | SHOW ssl; pg_stat_ssl; configuración cliente y rechazo sin TLS | Pendiente |
-| 7 | agente_ia SELECT, límites y READ ONLY | Conexión auténtica del agente: INSERT denegado; verificar ACL además del valor readonly | Pendiente |
-| 8 | Cabeceras Nginx | curl HEAD con --cacert, sin -k | Pendiente |
-| 9 | CA local y certificado SAN 30 días | Cadena verificada. Navegador solo confía después de importar CA | Pendiente |
-| 10 | Datos PostgreSQL, n8n/pgAdmin y backups con permisos restringidos | Revisar directorios 700 y .env600. El inicializador de volúmenes es root breve, aplicaciones no | Pendiente |
-| 11 | JSON/CSV, conexiones, duración y pg_stat_statements | Consulta lenta, vista de estadísticas y pgBadger real | Pendiente |
-| 12 | pg_settings_baseline | SELECT baseline y ensayo R5/H5 | Pendiente |
+| B1. Esquema **verificado** | 14 tablas, PK/FK y scripts inicializables | `bash scripts/test-init-ab.sh`; `\dt`; catálogos PK/FK | Contenedor limpio: 14 tablas, 20 triggers, 7 baseline; 14 PK, 5 FK y tres vistas en la base activa. |
+| B2. Semilla **verificada** | 3, 50, 100, 500, 1.500, 1.500, 300, 200 | Consulta de conteos en `docs/COMANDOS.md` | Los ocho conteos coinciden en la base activa. |
+| B3. Auditoría **verificada** | Usuario/fecha/operación/tabla/fila y JSON anterior/posterior | `\d auditoria_datos`; consulta de eventos | `fn_auditoria()` SECURITY DEFINER; índices por tabla, usuario y fecha. UPDATE y DELETE registrados. |
+| B4. Triggers **verificados** | INSERT/UPDATE/DELETE por fila y UPDATE/DELETE por sentencia en cuatro tablas | `information_schema.triggers` | 20 eventos de triggers activos en productos, lotes, ventas y clientes. |
+| B5. UPDATE **verificado** | Valores anterior y posterior correctos | `db/demo-audit.sql` | La fila 1503 registró `antes` → `despues` con usuario y fecha. |
+| B6. DELETE **verificado** | Registro de auditoría conserva fila anterior; posterior NULL; la fila de prueba no queda | `db/demo-audit.sql` | DELETE de fila ficticia 1503 auditado; valor anterior presente y `valor_nuevo IS NULL`. |
+| B7. Baseline **verificado** | Siete parámetros; SSL, autenticación y logging conforme | Join baseline/settings | Siete parámetros coinciden; SSL activo y log lento/conexiones habilitados. |
 
-Comandos de solo lectura adicionales están explicados en [EVIDENCIAS](EVIDENCIAS.md). No se confunde un listado de archivos con una prueba de que todos los permisos son correctos.
+## Pendientes fuera del resultado confirmado
 
-## Resto del alcance
-
-| Requisito | Archivos/solución | Situación |
-|---|---|---|
-| Cinco riesgos CIA | RIESGOS.md | Matriz con productos y niveles consistentes |
-| Tres roles SQL | db/sql/01-roles.sql y 05-access.sql | Implementado; pruebas SQL verifican permisos |
-| Viewer de solo lectura en n8n | Función nativa de la edición correspondiente | **Pendiente de licencia o acuerdo docente. No cubierto por Community ni por un simple usuario adicional** |
-| Alternativa de auditoría | /auditoria.html + clave auditor solo GET | Implementado. No se presenta como Viewer nativo |
-| Triggers en cuatro tablas | db/sql/04-audit.sql | Implementado y probado parcialmente en PostgreSQL16 standalone |
-| 17 alertas n8n/Telegram | app/checks.py + 17 JSON | Implementado; pruebas reales de despliegue y Telegram pendientes |
-| Cinco ataques | scripts/lab.py, qa.py, ESCENARIOS.md | Automatizados o guiados según acción; ejecución del grupo pendiente |
-| Rotación API key Groq | configure + groq-probe + SECRETOS.md | Procedimiento real; revocación requiere cuenta del integrante |
-| Filebeat + Loki | compose.logging.yaml y Logstash puente | Configuración incluida; construir y comprobar perfil completo en su Ubuntu |
-| pgbench/pgBadger | Perfil qa, comandos documentados | Herramientas incluidas; resultados deben medirse |
-| Backups y restauración | backup.sh y restore-test | Código incluido; ensayo completo Docker pendiente |
-| README para arrancar <5min | Arranque único con healthchecks | Objetivo de medición, no tiempo garantizado. Registrar caché, hardware y tiempo real |
-| Informe15–20 páginas | INFORME.md | Estructura para completar; no un informe de resultados inexistentes |
-| Exposición15min y cinco integrantes | EXPOSICION.md | Guion y reparto propuestos; ensayo pendiente |
-
-## Decisiones que conviene validar con el profesor
-
-1. ¿Se acepta auditor SQL + panel alternativo de solo lectura cuando no hay licencia Viewer nativa de n8n?
-2. ¿R4 debe acreditar ambos logs, dado que A1 es SSH y el catálogo original menciona PostgreSQL?
-3. ¿El objetivo de arranque de cinco minutos se mide con Docker y las imágenes ya instalados?
-4. ¿Se acepta la cadena Filebeat → Logstash → Loki? Filebeat no dispone de salida Loki nativa.
-
-Resolver estas preguntas no impide avanzar con el resto. No modificar el alcance ni marcarlo aprobado en nombre del profesor.
+- Repetir las capturas en la computadora de exposición. Esta sesión generó salidas de consola reales, no imágenes.
+- Adjuntar el PDF/Word original y la rúbrica oficial: no están en el checkout recibido.
+- Validar los flujos n8n end-to-end, monitor, Telegram, UFW real, Logstash/Loki, backups y escenarios que dependen de fuentes no incluidas. No son parte de los resultados A/B demostrados aquí.

@@ -1,5 +1,7 @@
 # Secretos, rotación y recuperación
 
+El monitor, `scripts/lab.py` y el flujo de rotación descritos abajo no están presentes en este checkout. La tabla es una guía de diseño; no ejecutar comandos de `lab.py` ni reportar una rotación externa como realizada.
+
 Los valores reales solo viven en `.env`, credenciales cifradas de n8n y runtime privado. No publicar .env, claves TLS, dumps, IDs internos con tokens, logs sensibles ni capturas de campos de credenciales. `.env.example` contiene nombres y valores vacíos/de ejemplo, nunca secretos válidos.
 
 | Secreto | Consumidor | Rotación propuesta | Acción efectiva |
