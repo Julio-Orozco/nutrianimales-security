@@ -1,6 +1,6 @@
 # Exposición de 15 minutos
 
-Guion propuesto, no evidencia de ensayo. Las demos de monitor, Telegram, ataques, backups y scripts referenciados no son ejecutables con el checkout actual; sustituirlas por resultados reales solo después de recibir esos componentes y probarlos.
+Guion propuesto, no evidencia de ensayo. Las demos de alertas, Telegram, ataques y backups no son ejecutables hasta que se adapten los flujos n8n (`docs/FLUJOS_N8N.md`); sustituirlas por resultados reales solo después de recibir esos componentes y probarlos.
 
 ## Demostración A/B comprobada
 
@@ -24,7 +24,7 @@ Guion propuesto, no evidencia de ensayo. Las demos de monitor, Telegram, ataques
 
 «La empresa es ficticia y los datos se generaron para repetir las pruebas sin usar información personal.»
 
-«n8n agenda cada detector; el monitor consulta estadísticas/logs reales y conserva la alerta antes de enviarla. Esto permite distinguir detectar, enviar y responder.»
+«n8n agenda cada detector, consulta estadísticas reales de PostgreSQL con una cuenta de monitoreo y guarda la alerta en `alertas_auditoria` antes de enviarla. Esto permite distinguir detectar, enviar y responder.»
 
 «La IA no ejecuta SQL libre. Solo resume reportes cuya consulta y permisos ya están definidos.»
 

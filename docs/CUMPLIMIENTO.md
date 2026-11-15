@@ -61,6 +61,6 @@ Estados basados en comandos ejecutados en esta instalación Docker el 14 de novi
 
 - Repetir las capturas en la computadora de exposición. Esta sesión generó salidas de consola reales, no imágenes.
 - Adjuntar el PDF/Word original y la rúbrica oficial: no están en el checkout recibido.
-- Validar los flujos n8n end-to-end, monitor, Telegram, UFW real, Logstash/Loki, backups y escenarios que dependen de fuentes no incluidas. No son parte de los resultados A/B demostrados aquí.
+- Adaptar y validar los flujos n8n end-to-end (`docs/FLUJOS_N8N.md`), Telegram, UFW real, Logstash/Loki, backups y escenarios que dependen de fuentes no incluidas. No son parte de los resultados A/B demostrados aquí.
 - Filebeat/UFW: en este WSL `/var/log/ufw.log` es un directorio vacío creado por Docker; se necesita UFW con registro activo (rsyslog) en el host. Corresponde a monitoreo y no se modificó.
 - Crear la cuenta propietaria de n8n en el navegador (primer acceso) e importar los flujos.

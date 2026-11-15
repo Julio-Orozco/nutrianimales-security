@@ -14,7 +14,7 @@ Compose crea una red bridge por proyecto llamada `<proyecto>_nutrianimales-net`.
 
 ## Telegram y Groq
 
-Este checkout no contiene el servicio `monitor` ni su integración de Telegram/Groq. Los flujos JSON y la documentación describen el diseño previsto; no están importados ni se presentan como funcionalidad probada. Tampoco se validaron credenciales externas.
+El proyecto no usa Python ni un servicio intermedio `monitor`: los flujos n8n deben consultar PostgreSQL con `monitor_db` y notificar por Telegram (ver `docs/FLUJOS_N8N.md`). Los flujos JSON actuales describen el diseño previsto; no están importados ni se presentan como funcionalidad probada. Tampoco se validaron credenciales externas.
 
 La configuración actual contiene Filebeat, pero no Logstash ni Loki. No se debe presentar una canalización de logs integrada como funcional.
 
@@ -24,4 +24,4 @@ Volúmenes nombrados: datos PostgreSQL y datos n8n. Las claves, certificados y `
 
 ## Cambios respecto de la guía
 
-Los flujos JSON describen propuestas de detectores, no acreditan alertas ejecutadas. Sin el servicio `monitor` ni el PDF de la rúbrica en el checkout, no es posible validar su extremo a extremo ni afirmar que coincide con los requisitos oficiales.
+Los flujos JSON describen propuestas de detectores, no acreditan alertas ejecutadas. Mientras no se adapten (`docs/FLUJOS_N8N.md`) y sin el PDF de la rúbrica en el checkout, no es posible validar su extremo a extremo ni afirmar que coincide con los requisitos oficiales.

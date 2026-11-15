@@ -1,6 +1,6 @@
 # NutriAnimales S.A. — Seguridad de infraestructura y base de datos
 
-Proyecto académico de Seguridad de Sistemas Digitales (BCD 9220). Los datos son ficticios. Este checkout contiene Docker Compose, PostgreSQL, Nginx, pgAdmin, Filebeat y 18 definiciones JSON de flujos n8n. No contiene el servicio `monitor`, los scripts `lab.py`/`host_agent.py`, el stack Logstash/Loki, ni el PDF/Word del informe; por tanto, esos componentes no se declaran desplegados ni comprobados.
+Proyecto académico de Seguridad de Sistemas Digitales (BCD 9220). Los datos son ficticios. Este checkout contiene Docker Compose, PostgreSQL, Nginx, pgAdmin, Filebeat y 18 definiciones JSON de flujos n8n. El proyecto **no usa Python**: la detección y las alertas se construyen con nodos de n8n que consultan PostgreSQL. No contiene el stack Logstash/Loki ni el PDF/Word del informe; por tanto, esos componentes no se declaran desplegados ni comprobados.
 
 ## Requisitos
 
@@ -85,7 +85,7 @@ La matriz de cumplimiento, los comandos de comprobación y los resultados de est
 
 ## Alcance no incluido en este checkout
 
-Los JSON de `n8n/workflows/` no se importan automáticamente y dependen de componentes/configuración que no están presentes aquí (servicio `monitor`, credenciales Telegram/Groq); su importación corresponde a los integrantes de monitoreo y bot. Tampoco se incluye una conexión Filebeat→Logstash→Loki ni el informe original adjunto. En este WSL, `/var/log/ufw.log` no es un archivo de log sino un directorio vacío creado por Docker al montar una ruta inexistente, por lo que Filebeat no recibe eventos UFW. No se debe afirmar que alertas, Telegram, monitor, ataques, backups o pruebas de otras partes están ejecutados. Para completar esas funciones se necesitan los archivos fuente y el documento oficial que no están en este espacio de trabajo.
+Los JSON de `n8n/workflows/` no se importan automáticamente y provienen de una versión anterior que llamaba a un servicio Python (`monitor`) que este proyecto no usa; los integrantes de monitoreo y bot deben adaptarlos o rehacerlos siguiendo [docs/FLUJOS_N8N.md](docs/FLUJOS_N8N.md). Tampoco se incluye una conexión Filebeat→Logstash→Loki ni el informe original adjunto. En este WSL, `/var/log/ufw.log` no es un archivo de log sino un directorio vacío creado por Docker al montar una ruta inexistente, por lo que Filebeat no recibe eventos UFW. No se debe afirmar que alertas, Telegram, monitor, ataques, backups o pruebas de otras partes están ejecutados. Para completar esas funciones se necesitan los archivos fuente y el documento oficial que no están en este espacio de trabajo.
 
 ## Detener sin borrar datos
 

@@ -1,5 +1,7 @@
 # Código: qué hace, para qué y por qué
 
+> **Documento heredado, no aplica.** Describe una versión anterior del proyecto basada en Python (`lab.py`, `app/`, servicio `monitor`). El proyecto **no usa Python** y estos comandos no se deben implementar. Se conserva solo como referencia de diseño de las reglas; para los flujos actuales ver [FLUJOS_N8N.md](FLUJOS_N8N.md).
+
 Este documento describe una implementación prevista, pero el checkout recibido no contiene `app/`, `scripts/lab.py`, `requirements*` ni `GUIA_CODIGO.html`. Las funciones y comandos de abajo no deben citarse como disponibles o ejecutados hasta que el equipo agregue esos archivos y los pruebe.
 
 ## Aplicación

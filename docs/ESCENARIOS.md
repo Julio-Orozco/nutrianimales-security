@@ -1,5 +1,7 @@
 # Escenarios y cinco ataques obligatorios
 
+> **Documento heredado, no aplica.** Describe una versión anterior del proyecto basada en Python (`lab.py`, `app/`, servicio `monitor`). El proyecto **no usa Python** y estos comandos no se deben implementar. Se conserva solo como referencia de diseño de las reglas; para los flujos actuales ver [FLUJOS_N8N.md](FLUJOS_N8N.md).
+
 Los escenarios y comandos de esta guía requieren `scripts/lab.py`, `monitor`, `ssh-lab` y servicios que no están incluidos en el checkout actual. Son procedimientos pendientes, no acciones disponibles ni resultados comprobados. No ejecutar cambios manuales de configuración de esta página sin revisar primero su impacto y reversión.
 
 Ejecutar solo sobre esta instalación con datos ficticios y `LAB_MODE=true`. Capturar consola/SQL, detección, hora, Telegram y respuesta. Los comandos no son evidencia de haberlos ejecutado. `--undo` revierte la configuración indicada; **no borra el rastro de auditoría**.

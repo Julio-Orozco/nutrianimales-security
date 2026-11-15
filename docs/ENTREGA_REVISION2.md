@@ -105,9 +105,9 @@ No se modificaron `nginx.conf`, `pg_hba.conf`, los certificados, los SQL 01–05
 
 - **Capturas de pantalla**: no se generaron imágenes; los comandos exactos están en `scripts/capturas-ab.sh`.
 - **Cuenta propietaria de n8n**: se crea en el navegador en el primer acceso. No se creó para no inventar credenciales.
-- **Flujos JSON**: no se importaron. Corresponde a monitoreo y bot; requieren el servicio `monitor` y credenciales de Telegram y Groq, que no están en el checkout. Comando de referencia, una vez creada la cuenta: `docker compose cp n8n/workflows n8n:/tmp/workflows && docker compose exec -T n8n n8n import:workflow --separate --input=/tmp/workflows`.
+- **Flujos JSON**: no se importaron. Llaman a un servicio Python (`monitor`) que el proyecto no usa; monitoreo y bot deben adaptarlos o rehacerlos según `docs/FLUJOS_N8N.md`. Comando de referencia, una vez creada la cuenta: `docker compose cp n8n/workflows n8n:/tmp/workflows && docker compose exec -T n8n n8n import:workflow --separate --input=/tmp/workflows`.
 - **Telegram, Groq y las 17 alertas**: no se probaron y no se declaran funcionales.
 - **Filebeat/UFW**: `/var/log/ufw.log` del host es un directorio vacío creado por Docker. Para resolverlo hay que habilitar UFW con registro (y rsyslog) en el host, borrar ese directorio y recrear Filebeat. No se modificó porque es tarea del integrante de monitoreo y requiere `sudo` en el host.
-- **Logstash/Loki, monitor, `lab.py`, `host_agent.py`**: no están en el checkout.
+- **Logstash/Loki**: no están en el checkout.
 - **Informe PDF/Word y rúbrica oficial**: no están disponibles. `docs/INFORME.md` contiene las secciones A y B actualizadas, listas para integrar en el documento original.
 - **Instalación nueva del volumen n8n**: en una instalación desde cero, aplicar una vez `docker compose exec -T n8n chmod 700 /home/node/.n8n`. La imagen crea el directorio con modo 755.

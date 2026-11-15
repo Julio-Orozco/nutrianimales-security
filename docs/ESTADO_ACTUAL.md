@@ -25,4 +25,4 @@ Los comandos y resultados acotados se documentan en `evidencias/RESULTADOS_AB.md
 
 ## Faltantes del material recibido
 
-El checkout no contiene el PDF/Word original del informe, la guía/rúbrica oficial, los scripts `lab.py` y `host_agent.py`, ni los servicios `monitor`, Logstash y Loki. Tampoco contiene pruebas de aceptación externas. No se declaran completos Telegram, alertas, escenarios de otras partes ni backups. El PDF base debe adjuntarse para integrar estas secciones en su formato original.
+El checkout no contiene el PDF/Word original del informe, la guía/rúbrica oficial ni los servicios Logstash y Loki. El proyecto no usa Python; los flujos n8n deben adaptarse según `docs/FLUJOS_N8N.md`. Tampoco contiene pruebas de aceptación externas. No se declaran completos Telegram, alertas, escenarios de otras partes ni backups. El PDF base debe adjuntarse para integrar estas secciones en su formato original.

@@ -27,7 +27,7 @@ La configuración inicial de la base se ejecuta únicamente cuando el volumen Po
 
 Los cinco contenedores aparecen en `docker compose ps`. El proceso servidor PostgreSQL opera con el usuario `postgres`; n8n, Nginx, pgAdmin y Filebeat usan UID no privilegiado. Los únicos puertos publicados son `127.0.0.1:8080` y `127.0.0.1:8443`, ambos de Nginx. pgAdmin se comunica por la red de Compose y el proxy usa el puerto interno 80. Tras la corrección descrita en la sección A.5, n8n 2.30.8 escucha en el puerto interno 5678 y Nginx entrega su interfaz en `https://localhost:8443/` con respuesta HTTP 200, incluido el canal WebSocket que usa el editor.
 
-Estos resultados describen la instancia comprobada; deben repetirse en la computadora de exposición. La existencia de un servicio en Compose no demuestra que componentes ausentes —por ejemplo, monitor, Logstash o Loki— estén desplegados.
+Estos resultados describen la instancia comprobada; deben repetirse en la computadora de exposición. La existencia de un servicio en Compose no demuestra que componentes ausentes —por ejemplo, Logstash o Loki— estén desplegados.
 
 ### A.4 Configuración de seguridad del entorno
 
@@ -87,4 +87,4 @@ La revisión confirmó que la auditoría no altera los permisos de las cuentas: 
 
 ## Limitaciones de la evidencia entregada
 
-No se recibieron el PDF/Word del informe actual ni la guía oficial del profesor, por lo que no se pudo editar el documento original ni contrastar literalmente la rúbrica. No se incluyen capturas de pantalla; se conservan salidas auténticas de comandos. El checkout tampoco incluye el servicio de monitoreo, el agente UFW, la canalización Logstash/Loki ni scripts de integración mencionados en documentación previa. Esos requisitos deben marcarse pendientes hasta contar con los archivos y repetir las pruebas correspondientes. La interfaz de n8n funciona, pero los flujos no se importaron y Telegram, Groq y las 17 alertas no se probaron.
+No se recibieron el PDF/Word del informe actual ni la guía oficial del profesor, por lo que no se pudo editar el documento original ni contrastar literalmente la rúbrica. No se incluyen capturas de pantalla; se conservan salidas auténticas de comandos. El proyecto no usa Python; los flujos heredados que llamaban a un servicio Python deben adaptarse a nodos de n8n (`docs/FLUJOS_N8N.md`). Tampoco se incluyen una fuente UFW del host ni la canalización Logstash/Loki. Esos requisitos deben marcarse pendientes hasta contar con los archivos y repetir las pruebas correspondientes. La interfaz de n8n funciona, pero los flujos no se importaron y Telegram, Groq y las 17 alertas no se probaron.

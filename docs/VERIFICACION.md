@@ -29,7 +29,7 @@ Los comandos y salidas resumidas están en `evidencias/RESULTADOS_AB.md`. La mat
 - Crear la cuenta propietaria de n8n desde el navegador e importar los flujos (responsabilidad de monitoreo/bot). La interfaz funciona; los flujos, Telegram y Groq no se han probado.
 - Ejecutar la instalación en el equipo de exposición y guardar las capturas propias de los doce controles.
 - Recibir la rúbrica oficial y el PDF/Word actual. No estaban en los archivos disponibles, por lo que `docs/INFORME.md` contiene secciones listas para integrar, no una edición del archivo original.
-- El checkout carece de `scripts/lab.py`, `scripts/host_agent.py`, `app/`, `monitor`, `compose.logging.yaml`, Logstash, Loki y pruebas automatizadas. Alertas, Telegram/Groq, UFW, backups y escenarios que dependan de ellos no se han probado ni se declaran completos.
+- El proyecto no usa Python. Los flujos n8n heredados llaman a un servicio Python que no se usará y deben adaptarse (`docs/FLUJOS_N8N.md`). Logstash/Loki no están incluidos. Alertas, Telegram/Groq, UFW, backups y escenarios no se han probado ni se declaran completos.
 - Medir arranque desde una instalación limpia, con equipo e imágenes especificados.
 
 ## Repetición básica

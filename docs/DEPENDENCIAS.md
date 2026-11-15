@@ -1,17 +1,9 @@
 # Dependencias y fuentes oficiales
 
-Esta tabla conserva el diseño documentado; este checkout no incluye el servicio Python, los archivos `requirements*` ni los scripts que aparecen abajo. Las versiones reales de los servicios se definen en `compose.yaml`. No tomar esta tabla como manifiesto de dependencias instaladas ni como verificación de vulnerabilidades.
+El proyecto no usa Python: solo Docker Compose, PostgreSQL, n8n, Nginx, pgAdmin y Filebeat, con scripts de shell. Las versiones reales de los servicios se definen en `compose.yaml`. No tomar esta tabla como manifiesto de dependencias instaladas ni como verificación de vulnerabilidades.
 
 | Dependencia | Para qué | Por qué esta elección / alternativa |
 |---|---|---|
-| Python3.12 | Servicio y utilidades | Sintaxis estándar y herramientas disponibles en Ubuntu24.04; evitar paquetes de sistema globales al desarrollar |
-| FastAPI | API con validación y autorización | Modelos tipados, rutas claras y cliente de pruebas; una API más pequeña podría usar stdlib, pero requeriría reimplementar validación |
-| Uvicorn | Servidor ASGI | Ejecuta FastAPI sin servidor de desarrollo; una réplica única para el estado local |
-| psycopg[binary]3 | PostgreSQL | Parámetros, transacciones y TLS. Binario simplifica instalación del laboratorio; no hace falta compilar libpq en la imagen |
-| pglast | AST SQL PostgreSQL | Interpreta comentarios, literales y estructuras; una regex no es un parser ni una política suficiente |
-| urllib/ssl stdlib | Telegram/Groq y administración local | Reduce dependencias y centraliza timeout/validación TLS |
-| pytest/httpx | Pruebas | Mock explícito de proveedores solo en tests; la ejecución externa se prueba por separado |
-| PyYAML | Inspección estática Compose | No reemplaza `docker compose config` ni levantar contenedores |
 | PostgreSQL `16.14` | Servidor del stack | Etiqueta definida en Compose; no declara parche de producción |
 | n8n `2.30.8` | Orquestación | Versión fijada en Compose (mismo digest que la imagen validada); actualizarla solo con respaldo, porque cada versión aplica migraciones al esquema `n8n` |
 | Nginx `latest` | Reverse proxy TLS | Etiqueta mutable; valida configuración local con `nginx -t` |
