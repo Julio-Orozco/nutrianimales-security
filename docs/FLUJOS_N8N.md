@@ -43,7 +43,8 @@ Cada flujo de detección (R, H, D) tiene esta forma:
 | SSL | `Require` |
 
 - **No** activar «Ignore SSL Issues» ni usar `postgres` u otra cuenta: `monitor_db` ya tiene exactamente los permisos necesarios (lectura, `pg_monitor`, `security_snapshot()` e inserción/actualización solo en `alertas_auditoria`).
-- PostgreSQL rechaza conexiones sin TLS (`pg_hba.conf`). Si n8n rechaza el certificado autofirmado, avisar al integrante de infraestructura (A) antes de cambiar algo.
+- PostgreSQL rechaza conexiones sin TLS (`pg_hba.conf`). El contenedor n8n confía en el certificado del laboratorio mediante `NODE_EXTRA_CA_CERTS=/run/pg-ca/server.crt` (en `compose.yaml`), por lo que la prueba de la credencial con `SSL: Require` da «Connection successful» sin ignorar errores SSL. Verificado el 14/11/2026.
+- En la instalación oficial ya existen las credenciales `Nutri Postgres monitor_db`, `Nutri Telegram bot` y `Nutri Groq` (las tres probadas con OK). Al importar los flujos allí, asignar esas. El `chat_id` del grupo «Alertas NutriAnimales» está en `TELEGRAM_CHAT_ID` del `.env`.
 - `N8N_BLOCK_ENV_ACCESS_IN_NODE=true` impide leer `.env` desde los nodos: la contraseña y los tokens se escriben en la credencial, nunca en el JSON ni en un nodo.
 
 ### 2. Reemplazar «Detectar XX»

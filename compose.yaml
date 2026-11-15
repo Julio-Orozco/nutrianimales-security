@@ -48,6 +48,8 @@ services:
       - N8N_BLOCK_ENV_ACCESS_IN_NODE=true
       - DB_POSTGRESDB_SSL_ENABLED=true
       - DB_POSTGRESDB_SSL_CA_FILE=/run/pg-ca/server.crt
+      # Los nodos Postgres de los flujos verifican el certificado del laboratorio.
+      - NODE_EXTRA_CA_CERTS=/run/pg-ca/server.crt
       - DB_POSTGRESDB_SSL_REJECT_UNAUTHORIZED=true
       - DB_POSTGRESDB_SCHEMA=n8n
       - N8N_LOG_LEVEL=debug
