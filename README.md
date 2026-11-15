@@ -23,9 +23,19 @@ El preparador crea `.env` con valores aleatorios solo si aún no existe, aplica 
 
 La primera inicialización carga el esquema y datos ficticios desde `db/sql/`. PostgreSQL solo ejecuta esos archivos cuando su volumen de datos está vacío; reiniciar o recrear contenedores conserva la base.
 
+### Actualizar una instalación existente (corrección del 502 de n8n)
+
+Si la base ya estaba creada antes de esta revisión, n8n seguirá intentando usar `monitor_db` hasta aplicar la migración. Desde WSL, en la raíz del proyecto:
+
+```bash
+bash scripts/migrate-n8n-app.sh
+```
+
+El script agrega `N8N_DB_PASSWORD` a `.env` si falta (sin modificar las demás variables), crea un respaldo verificable en `.runtime/backup-<fecha>/` (dump de la base, roles sin contraseñas y volumen `n8n_data`), aplica `db/sql/06-n8n.sqb`, recrea solo el contenedor n8n y comprueba `healthz` y `https://localhost:8443/`. No ejecuta `down -v` ni borra volúmenes. El detalle del problema y la solución está en [docs/ENTREGA_REVISION2.md](docs/ENTREGA_REVISION2.md).
+
 ## Acceso y puertos
 
-- n8n (ruta prevista): <https://localhost:8443>. En la verificación de este checkout el contenedor quedó en ejecución, pero no abrió 5678 y Nginx respondió 502; no se declara funcional hasta corregirlo.
+- n8n: <https://localhost:8443>. Verificado el 14/11/2026: `healthz` responde `ok`, la ruta raíz devuelve HTTP 200 con la interfaz de n8n y el WebSocket `/rest/push` se establece a través de Nginx. La primera visita muestra el formulario para crear la cuenta propietaria de n8n; esa cuenta la crea el equipo y no se guarda en el repositorio.
 - pgAdmin, a través del proxy Nginx: <https://localhost:8443/pgadmin/>
 - Redirección HTTP: `http://localhost:8080`
 - Solo Nginx publica puertos, ligados a `127.0.0.1`. PostgreSQL, n8n, pgAdmin y Filebeat no publican puertos al host. pgAdmin no publica `5050`.
@@ -52,6 +62,13 @@ docker compose exec -T postgres psql -X -U postgres -d nutrianimales -c "SELECT 
 bash scripts/test-init-ab.sh
 ```
 
+Para las capturas de los doce controles, cada control se ejecuta con una sola orden (`A1` … `A12`, `B1` … `B4`, `N8N`):
+
+```bash
+sh scripts/capturas-ab.sh A1
+sh scripts/capturas-ab.sh todo   # todos los controles seguidos
+```
+
 Para comprobar los conteos de las ocho tablas obligatorias:
 
 ```bash
@@ -68,7 +85,7 @@ La matriz de cumplimiento, los comandos de comprobación y los resultados de est
 
 ## Alcance no incluido en este checkout
 
-Los JSON de `n8n/workflows/` no se importan automáticamente y dependen de componentes/configuración que no están presentes aquí. Tampoco se incluye una conexión Filebeat→Logstash→Loki ni el informe original adjunto. No se debe afirmar que alertas, Telegram, monitor, ataques, backups o pruebas de otras partes están ejecutados. Para completar esas funciones se necesitan los archivos fuente y el documento oficial que no están en este espacio de trabajo.
+Los JSON de `n8n/workflows/` no se importan automáticamente y dependen de componentes/configuración que no están presentes aquí (servicio `monitor`, credenciales Telegram/Groq); su importación corresponde a los integrantes de monitoreo y bot. Tampoco se incluye una conexión Filebeat→Logstash→Loki ni el informe original adjunto. En este WSL, `/var/log/ufw.log` no es un archivo de log sino un directorio vacío creado por Docker al montar una ruta inexistente, por lo que Filebeat no recibe eventos UFW. No se debe afirmar que alertas, Telegram, monitor, ataques, backups o pruebas de otras partes están ejecutados. Para completar esas funciones se necesitan los archivos fuente y el documento oficial que no están en este espacio de trabajo.
 
 ## Detener sin borrar datos
 

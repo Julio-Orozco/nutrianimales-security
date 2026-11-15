@@ -1,6 +1,6 @@
 # Evidencias A y B
 
-Guardar únicamente salidas obtenidas en el laboratorio real. No se generaron capturas de pantalla en esta sesión; `evidencias/RESULTADOS_AB.md` contiene comandos y resultados de consola reales, sin secretos. Para una exposición en otra máquina, repetir las pruebas y guardar sus propias capturas.
+Guardar únicamente salidas obtenidas en el laboratorio real. Para cada captura obligatoria A01–A12 ejecutar `sh scripts/capturas-ab.sh A1` … `A12` en WSL y capturar la terminal completa (incluye fecha y hora). No se generaron capturas de pantalla en esta sesión; `evidencias/RESULTADOS_AB.md` contiene comandos y resultados de consola reales, sin secretos. Para una exposición en otra máquina, repetir las pruebas y guardar sus propias capturas.
 
 | Evidencia | Control / demostración | Comando o archivo | Qué acredita |
 |---|---|---|---|
@@ -18,6 +18,7 @@ Guardar únicamente salidas obtenidas en el laboratorio real. No se generaron ca
 | A12 | Baseline | Consulta join entre `pg_settings_baseline` y `pg_settings` | Siete parámetros y comparación individual. |
 | B01 | Esquema y datos | `\dt`, consulta de conteos | Tablas y cantidades de semilla. |
 | B02 | Triggers/función | Catálogo de `information_schema.triggers` y `\df` | Cuatro tablas, veinte eventos de triggers y funciones existentes. |
+| N01 | n8n detrás de Nginx | `sh scripts/capturas-ab.sh N8N` y navegador en `https://localhost:8443` | `healthz` ok, HTTP 200, esquema `n8n` propiedad de `n8n_app`. |
 | B03 | UPDATE/DELETE | `docker compose exec -T postgres psql ... < db/demo-audit.sql` | Valores antes/después, usuario y DELETE con `valor_nuevo IS NULL`; fila de prueba eliminada. |
 
 No usar `curl -k`, ocultar errores, editar imágenes para simular una captura ni marcar como exitoso un ensayo que no se ejecutó. No incluir `.env`, contraseñas, tokens, claves privadas ni información personal. El certificado público del laboratorio no es una credencial; su clave privada sí debe permanecer fuera de Git y del ZIP.

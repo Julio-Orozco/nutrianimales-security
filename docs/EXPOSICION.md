@@ -9,7 +9,8 @@ Guion propuesto, no evidencia de ensayo. Las demos de monitor, Telegram, ataques
 3. **HTTPS:** `curl --fail --cacert infra/certs/server.crt -I https://localhost:8443/auditoria.html`. Señalar los cuatro headers. El certificado es autofirmado; el navegador puede advertir hasta confiar en él.
 4. **Base y baseline:** ejecutar los conteos de `docs/COMANDOS.md` y comparar `pg_settings_baseline` con `pg_settings`. Explicar que se compararon siete parámetros.
 5. **UPDATE/DELETE:** `docker compose exec -T postgres psql -X -U postgres -d nutrianimales < db/demo-audit.sql`. Mostrar el antes/después, el usuario y el DELETE con valor posterior nulo; explicar que se borra solamente la fila de prueba.
-6. **Limitación honesta:** en esta sesión pgAdmin abre por el proxy, pero n8n devuelve 502, Filebeat no tiene una fuente UFW real y no se probaron Telegram/alertas. Mostrar solo lo que esté disponible al repetir la demo.
+6. **n8n:** `sh scripts/capturas-ab.sh N8N` y abrir <https://localhost:8443> en el navegador. Explicar que el 502 se debía a que n8n usaba la cuenta de monitoreo sin privilegio para su esquema y que ahora usa `n8n_app`, limitada al esquema `n8n`.
+7. **Limitación honesta:** Filebeat no tiene una fuente UFW real en este WSL y no se probaron flujos, Telegram ni alertas. Mostrar solo lo que esté disponible al repetir la demo.
 
 | Tiempo | Responsable | Qué mostrar y explicar |
 |---|---|---|

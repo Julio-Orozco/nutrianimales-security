@@ -13,7 +13,7 @@ Esta tabla conserva el diseño documentado; este checkout no incluye el servicio
 | pytest/httpx | Pruebas | Mock explícito de proveedores solo en tests; la ejecución externa se prueba por separado |
 | PyYAML | Inspección estática Compose | No reemplaza `docker compose config` ni levantar contenedores |
 | PostgreSQL `16.14` | Servidor del stack | Etiqueta definida en Compose; no declara parche de producción |
-| n8n `latest` | Orquestación | Etiqueta mutable en Compose; conviene fijar versión tras validar flujos |
+| n8n `2.30.8` | Orquestación | Versión fijada en Compose (mismo digest que la imagen validada); actualizarla solo con respaldo, porque cada versión aplica migraciones al esquema `n8n` |
 | Nginx `latest` | Reverse proxy TLS | Etiqueta mutable; valida configuración local con `nginx -t` |
 | pgAdmin `latest` | Administración gráfica | Etiqueta mutable; UID efectivo de imagen 5050 |
 | Filebeat `8.13.4` | Recolector configurado | Corre sin root, pero en este checkout emite a consola |

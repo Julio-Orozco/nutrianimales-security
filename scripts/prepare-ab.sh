@@ -13,12 +13,17 @@ if [ ! -f .env ]; then
     printf 'TI_PASSWORD=%s\n' "$(openssl rand -hex 32)"
     printf 'AUDITOR_PASSWORD=%s\n' "$(openssl rand -hex 32)"
     printf 'BACKUP_PASSWORD=%s\n' "$(openssl rand -hex 32)"
+    printf 'N8N_DB_PASSWORD=%s\n' "$(openssl rand -hex 32)"
     printf 'N8N_ENCRYPTION_KEY=%s\n' "$(openssl rand -hex 32)"
     printf 'PGADMIN_DEFAULT_EMAIL=%s\n' 'ti@nutrianimales.test'
     printf 'PGADMIN_DEFAULT_PASSWORD=%s\n' "$(openssl rand -hex 32)"
     printf 'TELEGRAM_BOT_TOKEN=\n'
     printf 'GROQ_API_KEY=\n'
   } > .env
+fi
+if ! grep -q '^N8N_DB_PASSWORD=.' .env; then
+  # .env previo a la cuenta n8n_app: se agrega la variable sin tocar las demás.
+  printf 'N8N_DB_PASSWORD=%s\n' "$(openssl rand -hex 32)" >> .env
 fi
 chmod 600 .env
 

@@ -37,7 +37,7 @@ docker run -d --rm --name "$name" --network none --env-file .env \
 ready=0
 for attempt in $(seq 1 90); do
   if initialized="$(docker exec "$name" psql -X -U postgres -d nutrianimales \
-    -Atqc "SELECT current_setting('listen_addresses')='*' AND (SELECT count(*) FROM clientes)=1500 AND (SELECT count(*) FROM pg_settings_baseline)=7 AND (SELECT count(*) FROM information_schema.triggers WHERE trigger_schema='public')=20" 2>/dev/null)"; then
+    -Atqc "SELECT current_setting('listen_addresses')='*' AND (SELECT count(*) FROM clientes)=1500 AND (SELECT count(*) FROM pg_settings_baseline)=7 AND (SELECT count(*) FROM information_schema.triggers WHERE trigger_schema='public')=20 AND (SELECT pg_get_userbyid(nspowner) FROM pg_namespace WHERE nspname='n8n')='n8n_app'" 2>/dev/null)"; then
     if [ "$initialized" = "t" ]; then
       ready=1
       break
@@ -52,4 +52,4 @@ if [ "$ready" -ne 1 ]; then
 fi
 
 docker exec "$name" psql -X -U postgres -d nutrianimales -Atqc \
-  "SELECT 'tables='||(SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE')||', triggers='||(SELECT count(*) FROM information_schema.triggers WHERE trigger_schema='public')||', baseline='||(SELECT count(*) FROM pg_settings_baseline)"
+  "SELECT 'tables='||(SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE')||', triggers='||(SELECT count(*) FROM information_schema.triggers WHERE trigger_schema='public')||', baseline='||(SELECT count(*) FROM pg_settings_baseline)||', n8n_owner='||(SELECT pg_get_userbyid(nspowner) FROM pg_namespace WHERE nspname='n8n')||', n8n_app_public_grants='||(SELECT count(*) FROM information_schema.role_table_grants WHERE grantee='n8n_app' AND table_schema='public')"

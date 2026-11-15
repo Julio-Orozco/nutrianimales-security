@@ -5,7 +5,7 @@ Fecha de ejecución: 14 de noviembre de 2026. Los resultados son de la instancia
 ## Resultados ejecutados
 
 - Docker Engine 29.6.2 y Compose v5.3.1; `docker compose config --quiet` terminó correctamente.
-- El Compose se recreó sin borrar volúmenes. PostgreSQL, n8n, Nginx, pgAdmin y Filebeat aparecen como procesos en ejecución. **Esto no equivale a que todos los endpoints estén disponibles:** pgAdmin funciona detrás de Nginx; n8n, aunque su contenedor queda en ejecución, no abre el puerto 5678 y el proxy devuelve 502. La causa no se pudo determinar en este checkout.
+- El Compose se recreó sin borrar volúmenes. PostgreSQL, n8n, Nginx, pgAdmin y Filebeat aparecen como procesos en ejecución. pgAdmin funciona detrás de Nginx. En la revisión 2 se identificó la causa del 502 de n8n (falta del privilegio `CREATE` de base para la sentencia `CREATE SCHEMA IF NOT EXISTS` que n8n ejecuta con `monitor_db`) y se corrigió con la cuenta dedicada `n8n_app`; ahora `https://localhost:8443/` devuelve HTTP 200 con la interfaz de n8n.
 - Solo Nginx publica `127.0.0.1:8080` y `127.0.0.1:8443`. pgAdmin no publica 5050 y PostgreSQL no publica 5432.
 - UID efectivos: PostgreSQL 999, n8n 1000, Nginx 1000, pgAdmin 5050 y Filebeat 1000 (grupo `adm` para la lectura opcional de logs).
 - La red bridge creada contiene los cinco servicios y tiene salida (no es `internal`). HBA acepta `samenet` con TLS/SCRAM y rechaza el resto de conexiones host.
@@ -26,7 +26,7 @@ Los comandos y salidas resumidas están en `evidencias/RESULTADOS_AB.md`. La mat
 
 ## Pendiente
 
-- Diagnosticar por qué n8n no abre su puerto y por qué la tabla de n8n está vacía; no afirmar que el servicio de UI o sus flujos funcionen.
+- Crear la cuenta propietaria de n8n desde el navegador e importar los flujos (responsabilidad de monitoreo/bot). La interfaz funciona; los flujos, Telegram y Groq no se han probado.
 - Ejecutar la instalación en el equipo de exposición y guardar las capturas propias de los doce controles.
 - Recibir la rúbrica oficial y el PDF/Word actual. No estaban en los archivos disponibles, por lo que `docs/INFORME.md` contiene secciones listas para integrar, no una edición del archivo original.
 - El checkout carece de `scripts/lab.py`, `scripts/host_agent.py`, `app/`, `monitor`, `compose.logging.yaml`, Logstash, Loki y pruebas automatizadas. Alertas, Telegram/Groq, UFW, backups y escenarios que dependan de ellos no se han probado ni se declaran completos.

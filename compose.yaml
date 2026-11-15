@@ -13,6 +13,7 @@ services:
       - TI_PASSWORD=${TI_PASSWORD:?Set TI_PASSWORD in .env}
       - AUDITOR_PASSWORD=${AUDITOR_PASSWORD:?Set AUDITOR_PASSWORD in .env}
       - BACKUP_PASSWORD=${BACKUP_PASSWORD:?Set BACKUP_PASSWORD in .env}
+      - N8N_DB_PASSWORD=${N8N_DB_PASSWORD:?Set N8N_DB_PASSWORD in .env}
       - POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256 --auth-local=trust
     command: ["postgres", "-c", "config_file=/etc/postgresql/postgresql.conf"]
     volumes:
@@ -31,7 +32,7 @@ services:
       retries: 5
 
   n8n:
-    image: n8nio/n8n:latest
+    image: n8nio/n8n:2.30.8
     container_name: nutrianimales_n8n
     restart: unless-stopped
     environment:
@@ -42,8 +43,8 @@ services:
       - DB_TYPE=postgresdb
       - DB_POSTGRESDB_HOST=postgres
       - DB_POSTGRESDB_DATABASE=nutrianimales
-      - DB_POSTGRESDB_USER=monitor_db
-      - DB_POSTGRESDB_PASSWORD=${MONITOR_PASSWORD:?Set MONITOR_PASSWORD in .env}
+      - DB_POSTGRESDB_USER=n8n_app
+      - DB_POSTGRESDB_PASSWORD=${N8N_DB_PASSWORD:?Set N8N_DB_PASSWORD in .env}
       - N8N_BLOCK_ENV_ACCESS_IN_NODE=true
       - DB_POSTGRESDB_SSL_ENABLED=true
       - DB_POSTGRESDB_SSL_CA_FILE=/run/pg-ca/server.crt

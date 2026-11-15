@@ -3,7 +3,7 @@
 | Componente | Función | Por qué se eligió | Límite |
 |---|---|---|---|
 | PostgreSQL 16 | Datos, roles, auditoría y baseline | Controles aplicados en la base; el proceso servidor corre como `postgres` | El superusuario puede alterar auditoría; no es almacenamiento inmutable externo |
-| n8n | Contenedor presente en Compose | Los JSON de flujos están en el repositorio y no contienen secretos | En esta prueba no abrió 5678 (502 por Nginx); los flujos no se importan automáticamente y falta `monitor` |
+| n8n | Contenedor presente en Compose | Los JSON de flujos están en el repositorio y no contienen secretos | Interfaz verificada por Nginx (HTTP 200) con la cuenta `n8n_app` limitada al esquema `n8n`; los flujos no se importan automáticamente y falta `monitor` |
 | Nginx | Único punto web publicado | TLS y cabeceras en un lugar | CSP permite scripts inline por compatibilidad con n8n; mejorable con una política específica validada |
 | pgAdmin | Administración gráfica | Se sirve detrás de Nginx por HTTPS | UID no privilegiado del Compose; no tiene puerto host propio |
 | Filebeat | Lectura opcional de logs UFW | Se ejecuta como usuario no-root | Su salida configurada es consola; no hay servicio Logstash/Loki en este checkout |
