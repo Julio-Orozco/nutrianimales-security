@@ -2,136 +2,177 @@
   "name": "Nutri R1 — Consulta lenta",
   "nodes": [
     {
-      "id": "706f72d5-9567-5165-80bd-37728d69ba44",
-      "name": "Cada 30 segundos",
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.2,
       "parameters": {
         "rule": {
           "interval": [
             {
-              "field": "seconds",
-              "secondsInterval": 30
+              "field": "seconds"
             }
           ]
         }
       },
+      "id": "39c689a3-0712-46eb-a39a-e44993c5838d",
+      "name": "Cada 30 segundos",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
       "position": [
         0,
         0
       ],
-      "notes": "Agenda de la regla R1. Sondeo periódico, no detección instantánea garantizada.",
-      "notesInFlow": true
+      "notesInFlow": true,
+      "notes": "Agenda de la regla R1. Sondeo periódico, no detección instantánea garantizada."
     },
     {
-      "id": "aeae0485-6434-5f0f-a245-bfbb493c5c1f",
+      "parameters": {},
+      "id": "07b46cd8-9bb0-4563-91b9-748bb899c5d3",
       "name": "Prueba manual",
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
-      "parameters": {},
       "position": [
         0,
-        240
+        272
       ],
-      "notes": "Permite ejecutar esta misma regla desde el editor durante QA.",
-      "notesInFlow": true
-    },
-    {
-      "id": "d39c3751-94b4-53e6-b8f8-39e307f840c1",
-      "name": "Detectar R1",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "parameters": {
-        "method": "POST",
-        "url": "http://monitor:8000/checks/R1",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "options": {
-          "timeout": 120000
-        }
-      },
-      "position": [
-        260,
-        0
-      ],
-      "notes": "Consulta lenta. Fuente: pg_stat_statements. Condición: Promedio de ejecuciones nuevas > 1000 ms. Devuelve evidencia real o un error de fuente no disponible.",
       "notesInFlow": true,
-      "credentials": {
-        "httpHeaderAuth": {
-          "id": "REEMPLAZAR_AL_IMPORTAR",
-          "name": "Nutri monitor"
-        }
-      },
-      "retryOnFail": true,
-      "maxTries": 3,
-      "waitBetweenTries": 2000
+      "notes": "Permite ejecutar esta misma regla desde el editor durante QA."
     },
     {
-      "id": "e96865c4-d51e-5aa4-8884-d003cf263483",
-      "name": "Hay hallazgo",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.2,
       "parameters": {
         "conditions": {
           "options": {
-            "caseSensitive": true,
+            "caseSensitive": {},
             "leftValue": "",
-            "typeValidation": "strict",
-            "version": 2
+            "typeValidation": {},
+            "version": {}
           },
           "conditions": [
             {
               "id": "R1",
-              "leftValue": "={{ $json.detected }}",
+              "leftValue": "={{ $json.queryid }}",
               "rightValue": true,
               "operator": {
-                "type": "boolean",
-                "operation": "true",
+                "type": "string",
+                "operation": "notEmpty",
                 "singleValue": true
               }
             }
           ],
           "combinator": "and"
-        }
+        },
+        "options": {}
       },
+      "id": "4b8fd9e7-4cd2-4b11-a0ca-4d284ff87dd7",
+      "name": "Hay hallazgo",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
       "position": [
-        520,
+        528,
         0
       ],
-      "notes": "Solo la rama verdadera solicita notificación. Sin hallazgo no se envía Telegram.",
-      "notesInFlow": true
+      "notesInFlow": true,
+      "notes": "Solo la rama verdadera solicita notificación. Sin hallazgo no se envía Telegram."
     },
     {
-      "id": "b76538a6-a36a-5f95-a2bf-f6ee6f3f1b21",
-      "name": "Notificar R1",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
       "parameters": {
-        "method": "POST",
-        "url": "=http://monitor:8000/notify/{{ $json.event_id }}",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "options": {
-          "timeout": 120000
-        }
+        "operation": "executeQuery",
+        "query": "SELECT queryid, calls, round(mean_exec_time) AS ms_promedio, left(query,200) AS consulta\nFROM pg_stat_statements\nWHERE mean_exec_time > 1000\n  AND query NOT ILIKE '%pg_stat_statements%'\nORDER BY mean_exec_time DESC\nLIMIT 5;",
+        "options": {}
       },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
       "position": [
-        800,
+        208,
         0
       ],
-      "notes": "Invoca una operación fija del monitor. La credencial se importa cifrada en n8n, nunca en este JSON. Reintenta fallos transitorios; la bandeja evita duplicados normales.",
-      "notesInFlow": true,
+      "id": "ee51c959-a5c7-45a6-8c12-b001bb39afb2",
+      "name": "Detectar R1",
+      "alwaysOutputData": true,
       "credentials": {
-        "httpHeaderAuth": {
-          "id": "REEMPLAZAR_AL_IMPORTAR",
-          "name": "Nutri monitor"
+        "postgres": {
+          "id": "1Cx22i0z55yy8wXL",
+          "name": "Nutri Postgres monitor_db"
         }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO alertas_auditoria (tipo, alerta, mensaje, detalles, severidad, huella)\nVALUES (\n  'rendimiento',\n  'R1',\n  'Consulta lenta detectada',\n  '{{ JSON.stringify($json) }}'::jsonb,\n  'media',\n  'R1-{{ $json.queryid }}-{{ $json.calls }}'\n)\nON CONFLICT (huella) DO NOTHING\nRETURNING id;",
+        "options": {}
       },
-      "retryOnFail": true,
-      "maxTries": 3,
-      "waitBetweenTries": 2000
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        144,
+        144
+      ],
+      "id": "2fcc0d5e-5c2f-462a-b6cc-a51affd330d2",
+      "name": "Registrar alerta R1",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "1Cx22i0z55yy8wXL",
+          "name": "Nutri Postgres monitor_db"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": {},
+            "leftValue": "",
+            "typeValidation": {},
+            "version": {}
+          },
+          "conditions": [
+            {
+              "id": "9e66e48e-16da-4756-8bbd-67d71b8ecdf1",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        352,
+        144
+      ],
+      "id": "5f5ad1ee-a862-4b6c-abde-103d795faca0",
+      "name": "Es alerta nueva?"
+    },
+    {
+      "parameters": {
+        "chatId": "-5513672600",
+        "text": "=🚨 *ALERTA R1 — Consulta lenta detectada* • ID evento: {{ $json.id }} • Query ID: {{ $('Detectar R1').item.json.queryid }} • Promedio: {{ $('Detectar R1').item.json.ms_promedio }} ms ({{ $('Detectar R1').item.json.calls }} ejecuciones) • SQL: `{{ $('Detectar R1').item.json.consulta }}`",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        656,
+        144
+      ],
+      "id": "d66a706f-5598-48d3-852b-35f0f9c5bf9b",
+      "name": "Enviar alerta R1",
+      "webhookId": "3e0a244b-f939-4cea-a8f3-682a96aac740",
+      "credentials": {
+        "telegramApi": {
+          "id": "buC8KFqNgkVUsSoI",
+          "name": "Nutri Telegram bot"
+        }
+      }
     }
   ],
+  "pinData": {},
   "connections": {
     "Cada 30 segundos": {
       "main": [
@@ -155,6 +196,17 @@
         ]
       ]
     },
+    "Hay hallazgo": {
+      "main": [
+        [
+          {
+            "node": "Registrar alerta R1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Detectar R1": {
       "main": [
         [
@@ -166,21 +218,40 @@
         ]
       ]
     },
-    "Hay hallazgo": {
+    "Registrar alerta R1": {
       "main": [
         [
           {
-            "node": "Notificar R1",
+            "node": "Es alerta nueva?",
             "type": "main",
             "index": 0
           }
-        ],
-        []
+        ]
+      ]
+    },
+    "Es alerta nueva?": {
+      "main": [
+        [
+          {
+            "node": "Enviar alerta R1",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     }
   },
+  "active": false,
   "settings": {
     "executionOrder": "v1",
-    "timezone": "America/Costa_Rica"
-  }
+    "binaryMode": "separate"
+  },
+  "versionId": "195c0e07-8421-4d6f-a963-c62444ac057f",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "e59ebbaf3db5880c93bb1012846c792a2332815d03ff00026d455885dc224d06"
+  },
+  "nodeGroups": [],
+  "id": "M0LRvSkwKNgfDIFt",
+  "tags": []
 }

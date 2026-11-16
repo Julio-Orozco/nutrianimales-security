@@ -2,136 +2,177 @@
   "name": "Nutri H3 — Permisos indebidos a agente_ia",
   "nodes": [
     {
-      "id": "706f72d5-9567-5165-80bd-37728d69ba44",
-      "name": "Cada 30 segundos",
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.2,
       "parameters": {
         "rule": {
           "interval": [
             {
-              "field": "seconds",
-              "secondsInterval": 30
+              "field": "seconds"
             }
           ]
         }
       },
+      "id": "650aac76-10b9-424a-8d9f-b2ee413efe6a",
+      "name": "Cada 30 segundos",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
       "position": [
         0,
         0
       ],
-      "notes": "Agenda de la regla H3. Sondeo periódico, no detección instantánea garantizada.",
-      "notesInFlow": true
+      "notesInFlow": true,
+      "notes": "Agenda de la regla R1. Sondeo periódico, no detección instantánea garantizada."
     },
     {
-      "id": "aeae0485-6434-5f0f-a245-bfbb493c5c1f",
+      "parameters": {},
+      "id": "60d2676c-5517-4d46-8e83-e56d8f045f8d",
       "name": "Prueba manual",
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
-      "parameters": {},
       "position": [
         0,
-        240
+        272
       ],
-      "notes": "Permite ejecutar esta misma regla desde el editor durante QA.",
-      "notesInFlow": true
-    },
-    {
-      "id": "23e504ba-e73a-52ba-aedc-a517bce19b0d",
-      "name": "Detectar H3",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "parameters": {
-        "method": "POST",
-        "url": "http://monitor:8000/checks/H3",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "options": {
-          "timeout": 120000
-        }
-      },
-      "position": [
-        260,
-        0
-      ],
-      "notes": "Permisos indebidos a agente_ia. Fuente: ACL efectivas + pg_roles. Condición: Escritura, CREATE o administración. Devuelve evidencia real o un error de fuente no disponible.",
       "notesInFlow": true,
-      "credentials": {
-        "httpHeaderAuth": {
-          "id": "REEMPLAZAR_AL_IMPORTAR",
-          "name": "Nutri monitor"
-        }
-      },
-      "retryOnFail": true,
-      "maxTries": 3,
-      "waitBetweenTries": 2000
+      "notes": "Permite ejecutar esta misma regla desde el editor durante QA."
     },
     {
-      "id": "e96865c4-d51e-5aa4-8884-d003cf263483",
-      "name": "Hay hallazgo",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.2,
       "parameters": {
         "conditions": {
           "options": {
-            "caseSensitive": true,
+            "caseSensitive": {},
             "leftValue": "",
-            "typeValidation": "strict",
-            "version": 2
+            "typeValidation": {},
+            "version": {}
           },
           "conditions": [
             {
-              "id": "H3",
-              "leftValue": "={{ $json.detected }}",
+              "id": "R1",
+              "leftValue": "={{ $json.privilegios }}",
               "rightValue": true,
               "operator": {
-                "type": "boolean",
-                "operation": "true",
+                "type": "string",
+                "operation": "notEmpty",
                 "singleValue": true
               }
             }
           ],
           "combinator": "and"
-        }
+        },
+        "options": {}
       },
+      "id": "22511532-84f1-4141-96b8-cae92296cdfb",
+      "name": "Hay hallazgo",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
       "position": [
-        520,
+        528,
         0
       ],
-      "notes": "Solo la rama verdadera solicita notificación. Sin hallazgo no se envía Telegram.",
-      "notesInFlow": true
+      "notesInFlow": true,
+      "notes": "Solo la rama verdadera solicita notificación. Sin hallazgo no se envía Telegram."
     },
     {
-      "id": "eb4f1c8c-d761-5740-9199-8599fd5ed2d1",
-      "name": "Notificar H3",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
       "parameters": {
-        "method": "POST",
-        "url": "=http://monitor:8000/notify/{{ $json.event_id }}",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "options": {
-          "timeout": 120000
-        }
+        "conditions": {
+          "options": {
+            "caseSensitive": {},
+            "leftValue": "",
+            "typeValidation": {},
+            "version": {}
+          },
+          "conditions": [
+            {
+              "id": "9e66e48e-16da-4756-8bbd-67d71b8ecdf1",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
       },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
       "position": [
-        800,
+        352,
+        144
+      ],
+      "id": "2f1079c7-61b9-46c2-bde4-6707e1b350d6",
+      "name": "Es alerta nueva?"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH priv AS (\n  SELECT security_snapshot() -> 'privilegios_agente' AS p\n)\nSELECT\n  p AS privilegios,\n  (p->>'superuser')::boolean AS superuser,\n  (p->>'createrole')::boolean AS createrole,\n  (p->>'createdb')::boolean AS createdb,\n  (p->>'create_schema')::boolean AS create_schema,\n  p->'escritura' AS escritura\nFROM priv\nWHERE (p->>'superuser')::boolean\n   OR (p->>'createrole')::boolean\n   OR (p->>'createdb')::boolean\n   OR (p->>'create_schema')::boolean\n   OR jsonb_array_length(p->'escritura') > 0;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        208,
         0
       ],
-      "notes": "Invoca una operación fija del monitor. La credencial se importa cifrada en n8n, nunca en este JSON. Reintenta fallos transitorios; la bandeja evita duplicados normales.",
-      "notesInFlow": true,
+      "id": "9c299b08-08b1-478d-9db8-329678432ad3",
+      "name": "Detectar H3",
+      "alwaysOutputData": true,
       "credentials": {
-        "httpHeaderAuth": {
-          "id": "REEMPLAZAR_AL_IMPORTAR",
-          "name": "Nutri monitor"
+        "postgres": {
+          "id": "1Cx22i0z55yy8wXL",
+          "name": "Nutri Postgres monitor_db"
         }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO alertas_auditoria (tipo, alerta, mensaje, detalles, severidad, huella)\nVALUES (\n  'hardening',\n  'H3',\n  'Permisos indebidos otorgados al rol agente_ia',\n  '{{ JSON.stringify($json) }}'::jsonb,\n  'alta',\n  'H3-{{ JSON.stringify($json.escritura) }}-{{ $json.superuser }}'\n)\nON CONFLICT (huella) DO NOTHING\nRETURNING id;",
+        "options": {}
       },
-      "retryOnFail": true,
-      "maxTries": 3,
-      "waitBetweenTries": 2000
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        144,
+        144
+      ],
+      "id": "3714bef5-61fb-42b7-b8d4-2d4c1fc4e3db",
+      "name": "Registrar alerta H3",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "1Cx22i0z55yy8wXL",
+          "name": "Nutri Postgres monitor_db"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "-5513672600",
+        "text": "=🚨 *ALERTA H3 — Permisos indebidos a agente_ia*\n• ID evento: {{ $json.id }}\n• Escritura: `{{ JSON.stringify($('Detectar H3').item.json.escritura) }}`\n• Admin: superuser={{ $('Detectar H3').item.json.superuser }}, create_schema={{ $('Detectar H3').item.json.create_schema }}\n",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        656,
+        144
+      ],
+      "id": "919786e0-a0c2-45b6-928a-21e7336a368b",
+      "name": "Enviar alerta H3",
+      "webhookId": "9dbabad9-a224-4989-b17b-ede79f42c303",
+      "credentials": {
+        "telegramApi": {
+          "id": "buC8KFqNgkVUsSoI",
+          "name": "Nutri Telegram bot"
+        }
+      }
     }
   ],
+  "pinData": {},
   "connections": {
     "Cada 30 segundos": {
       "main": [
@@ -155,6 +196,28 @@
         ]
       ]
     },
+    "Hay hallazgo": {
+      "main": [
+        [
+          {
+            "node": "Registrar alerta H3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Es alerta nueva?": {
+      "main": [
+        [
+          {
+            "node": "Enviar alerta H3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Detectar H3": {
       "main": [
         [
@@ -166,21 +229,30 @@
         ]
       ]
     },
-    "Hay hallazgo": {
+    "Registrar alerta H3": {
       "main": [
         [
           {
-            "node": "Notificar H3",
+            "node": "Es alerta nueva?",
             "type": "main",
             "index": 0
           }
-        ],
-        []
+        ]
       ]
     }
   },
+  "active": false,
   "settings": {
     "executionOrder": "v1",
-    "timezone": "America/Costa_Rica"
-  }
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "a5c6fc25-ab10-454f-9f80-c7c0fadfda82",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "e59ebbaf3db5880c93bb1012846c792a2332815d03ff00026d455885dc224d06"
+  },
+  "nodeGroups": [],
+  "id": "Ird6UUran9YKMG7H",
+  "tags": []
 }
