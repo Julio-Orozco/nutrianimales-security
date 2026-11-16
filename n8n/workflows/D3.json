@@ -1,1 +1,187 @@
-[{"updatedAt":"2026-11-16T09:00:22.511Z","createdAt":"2026-11-16T08:42:36.909Z","id":"nutrianimalesD03","name":"Nutri D3 — Backup obsoleto","description":null,"active":false,"isArchived":false,"nodes":[{"parameters":{"rule":{"interval":[{"field":"seconds"}]}},"id":"706f72d5-9567-5165-80bd-37728d69ba44","name":"Cada 30 segundos","type":"n8n-nodes-base.scheduleTrigger","typeVersion":1.2,"position":[-240,0],"notesInFlow":true,"notes":"Agenda de la regla D3. Sondeo periódico, no detección instantánea garantizada."},{"parameters":{},"id":"aeae0485-6434-5f0f-a245-bfbb493c5c1f","name":"Prueba manual","type":"n8n-nodes-base.manualTrigger","typeVersion":1,"position":[-240,240],"notesInFlow":true,"notes":"Permite ejecutar esta misma regla desde el editor durante QA."},{"parameters":{"conditions":{"options":{"caseSensitive":{},"leftValue":"","typeValidation":{},"version":{}},"conditions":[{"id":"D3","leftValue":"={{ $json.detectado }}","rightValue":true,"operator":{"type":"boolean","operation":"true","singleValue":true}}],"combinator":"and"},"options":{}},"id":"e96865c4-d51e-5aa4-8884-d003cf263483","name":"Hay hallazgo","type":"n8n-nodes-base.if","typeVersion":2.2,"position":[240,0],"notesInFlow":true,"notes":"Solo la rama verdadera solicita notificación. Sin hallazgo no se envía Telegram."},{"parameters":{"operation":"executeQuery","query":"SELECT max(fecha) AS ultimo_ok,\n       coalesce(max(fecha) < now() - interval '24 hours', true) AS detectado\nFROM backups WHERE estado='ok';","options":{}},"type":"n8n-nodes-base.postgres","typeVersion":2.6,"position":[32,16],"id":"acf5d237-b22c-4219-a3e5-0d6e95dd20d2","name":"Detectar D3","alwaysOutputData":true,"credentials":{"postgres":{"id":"KGBDUlLWU9n2TTvZ","name":"Postgres account"}}},{"parameters":{"chatId":"=-5513672600","text":"=ADVERTENCIA - NutriAnimales S.A. | Lead University BCD 9220 Tipo: Backup obsoleto, sin respaldo reciente Último backup OK: {{ $('Detectar D3').item.json.ultimo_ok }} Umbral: más de 24 horas Severidad: ADVERTENCIA Acción: Ejecutar un respaldo y verificar la tabla backups.","additionalFields":{}},"type":"n8n-nodes-base.telegram","typeVersion":1.2,"position":[672,-16],"id":"0b72ea0f-4a72-4ad1-ab60-86a594b6175b","name":"Send a text message","webhookId":"154c0d29-7170-4789-b989-e2a13c04c07d","credentials":{"telegramApi":{"id":"bhaFlQSuqTSuV9EE","name":"Telegram account"}}},{"parameters":{"operation":"executeQuery","query":"INSERT INTO alertas_auditoria (tipo, alerta, mensaje, detalles, severidad, huella)\nVALUES ('datos', 'D3', 'Backup obsoleto: sin respaldo en 24 horas', '{{ JSON.stringify($json) }}'::jsonb, 'media',\n        'D3-' || to_char(now(), 'YYYYMMDD'))\nON CONFLICT (huella) DO NOTHING\nRETURNING id;","options":{}},"type":"n8n-nodes-base.postgres","typeVersion":2.6,"position":[464,-16],"id":"0842c0f1-11fb-4769-9a28-f62b250e6342","name":"Registrar D3","credentials":{"postgres":{"id":"KGBDUlLWU9n2TTvZ","name":"Postgres account"}}}],"connections":{"Cada 30 segundos":{"main":[[{"node":"Detectar D3","type":"main","index":0}]]},"Prueba manual":{"main":[[{"node":"Detectar D3","type":"main","index":0}]]},"Hay hallazgo":{"main":[[{"node":"Registrar D3","type":"main","index":0}],[]]},"Detectar D3":{"main":[[{"node":"Hay hallazgo","type":"main","index":0}]]},"Registrar D3":{"main":[[{"node":"Send a text message","type":"main","index":0}]]}},"settings":{"executionOrder":"v1","timezone":"America/Costa_Rica","binaryMode":"separate"},"staticData":null,"meta":{"templateCredsSetupCompleted":true},"nodeGroups":[],"pinData":{},"versionId":"a4f47688-9546-44dd-844a-0201f1587ff2","activeVersionId":null,"versionCounter":21,"triggerCount":0,"sourceWorkflowId":null,"tags":[],"shared":[{"updatedAt":"2026-11-16T08:42:36.909Z","createdAt":"2026-11-16T08:42:36.909Z","role":"workflow:owner","workflowId":"nutrianimalesD03","projectId":"EqfRyi2VEEMIpO0R","project":{"updatedAt":"2026-11-16T07:32:35.016Z","createdAt":"2026-11-16T03:41:57.038Z","id":"EqfRyi2VEEMIpO0R","name":"Jafet Rojas Carranza <jafetrojascar@gmail.com>","type":"personal","icon":null,"description":null,"customTelemetryTags":[],"creatorId":"9d4bff8e-16c4-4ef7-9328-233a089d14a1"}}],"versionMetadata":{"name":null,"description":null}}]
+{
+  "name": "Nutri D3 — Backup obsoleto",
+  "nodes": [
+    {
+      "id": "706f72d5-9567-5165-80bd-37728d69ba44",
+      "name": "Cada 30 segundos",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "seconds",
+              "secondsInterval": 30
+            }
+          ]
+        }
+      },
+      "position": [
+        0,
+        0
+      ],
+      "notes": "Agenda de la regla D3. Sondeo periódico, no detección instantánea garantizada.",
+      "notesInFlow": true
+    },
+    {
+      "id": "aeae0485-6434-5f0f-a245-bfbb493c5c1f",
+      "name": "Prueba manual",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "parameters": {},
+      "position": [
+        0,
+        240
+      ],
+      "notes": "Permite ejecutar esta misma regla desde el editor durante QA.",
+      "notesInFlow": true
+    },
+    {
+      "id": "452eb81a-3ebf-50d6-bab6-09ad6ac19c2a",
+      "name": "Detectar D3",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "parameters": {
+        "method": "POST",
+        "url": "http://monitor:8000/checks/D3",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "position": [
+        260,
+        0
+      ],
+      "notes": "Backup obsoleto. Fuente: Tabla backups. Condición: Sin backup ok de las últimas 24 horas. Devuelve evidencia real o un error de fuente no disponible.",
+      "notesInFlow": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REEMPLAZAR_AL_IMPORTAR",
+          "name": "Nutri monitor"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "id": "e96865c4-d51e-5aa4-8884-d003cf263483",
+      "name": "Hay hallazgo",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "D3",
+              "leftValue": "={{ $json.detected }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "position": [
+        520,
+        0
+      ],
+      "notes": "Solo la rama verdadera solicita notificación. Sin hallazgo no se envía Telegram.",
+      "notesInFlow": true
+    },
+    {
+      "id": "0df24284-f07f-59fc-bac3-5ecee3872ada",
+      "name": "Notificar D3",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "parameters": {
+        "method": "POST",
+        "url": "=http://monitor:8000/notify/{{ $json.event_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "position": [
+        800,
+        0
+      ],
+      "notes": "Invoca una operación fija del monitor. La credencial se importa cifrada en n8n, nunca en este JSON. Reintenta fallos transitorios; la bandeja evita duplicados normales.",
+      "notesInFlow": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REEMPLAZAR_AL_IMPORTAR",
+          "name": "Nutri monitor"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    }
+  ],
+  "connections": {
+    "Cada 30 segundos": {
+      "main": [
+        [
+          {
+            "node": "Detectar D3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prueba manual": {
+      "main": [
+        [
+          {
+            "node": "Detectar D3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detectar D3": {
+      "main": [
+        [
+          {
+            "node": "Hay hallazgo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hay hallazgo": {
+      "main": [
+        [
+          {
+            "node": "Notificar D3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Costa_Rica"
+  },
+  "id": "nutrianimalesD03"
+}
