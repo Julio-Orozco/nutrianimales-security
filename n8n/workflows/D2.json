@@ -1,1 +1,187 @@
-[{"updatedAt":"2026-11-16T08:48:06.501Z","createdAt":"2026-11-16T08:42:32.173Z","id":"nutrianimalesD02","name":"Nutri D2 — Crecimiento anormal","description":null,"active":false,"isArchived":false,"nodes":[{"parameters":{"rule":{"interval":[{"field":"seconds"}]}},"id":"706f72d5-9567-5165-80bd-37728d69ba44","name":"Cada 30 segundos","type":"n8n-nodes-base.scheduleTrigger","typeVersion":1.2,"position":[-144,0],"notesInFlow":true,"notes":"Agenda de la regla D2. Sondeo periódico, no detección instantánea garantizada."},{"parameters":{},"id":"aeae0485-6434-5f0f-a245-bfbb493c5c1f","name":"Prueba manual","type":"n8n-nodes-base.manualTrigger","typeVersion":1,"position":[-144,240],"notesInFlow":true,"notes":"Permite ejecutar esta misma regla desde el editor durante QA."},{"parameters":{"conditions":{"options":{"caseSensitive":{},"leftValue":"","typeValidation":{},"version":{}},"conditions":[{"id":"D2","leftValue":"={{ $json.detectado }}","rightValue":true,"operator":{"type":"boolean","operation":"true","singleValue":true}}],"combinator":"and"},"options":{}},"id":"e96865c4-d51e-5aa4-8884-d003cf263483","name":"Hay hallazgo","type":"n8n-nodes-base.if","typeVersion":2.2,"position":[384,0],"notesInFlow":true,"notes":"Solo la rama verdadera solicita notificación. Sin hallazgo no se envía Telegram."},{"parameters":{"operation":"executeQuery","query":"INSERT INTO alertas_auditoria (tipo, alerta, mensaje, detalles, severidad, huella)\nVALUES ('datos', 'D2', 'Crecimiento anormal en tabla ventas', '{{ JSON.stringify($json) }}'::jsonb, 'media',\n        'D2-' || to_char(date_trunc('hour', now()) + floor(extract(minute from now())/30) * interval '30 minutes', 'YYYYMMDDHH24MI'))\nON CONFLICT (huella) DO NOTHING\nRETURNING id;","options":{}},"type":"n8n-nodes-base.postgres","typeVersion":2.6,"position":[656,-16],"id":"483257b6-0ed8-4c5d-a1d9-70cc1d190dbd","name":"Registrar D2","credentials":{"postgres":{"id":"KGBDUlLWU9n2TTvZ","name":"Postgres account"}}},{"parameters":{"chatId":"-5513672600","text":"=ADVERTENCIA - NutriAnimales S.A. | Lead University BCD 9220 Tipo: Crecimiento anormal de tabla Tabla: ventas Filas nuevas (30 min): {{ $('Detectar D2').item.json.nuevas }} Total de filas: {{ $('Detectar D2').item.json.total }} Umbral: más de 20% en 30 min Severidad: ADVERTENCIA Acción: Verificar si es una carga legítima. Consultar auditoria_datos.","additionalFields":{}},"type":"n8n-nodes-base.telegram","typeVersion":1.2,"position":[864,-16],"id":"df92e926-f9cb-4b1c-98ef-1596d62e8405","name":"Enviar D2 a telegram","webhookId":"95d66610-3585-42a8-bb65-6ecb22959388","credentials":{"telegramApi":{"id":"bhaFlQSuqTSuV9EE","name":"Telegram account"}}},{"parameters":{"operation":"executeQuery","query":"SELECT nuevas, total, nuevas > 0.2 * (total - nuevas) AS detectado\nFROM (\n  SELECT count(*) FILTER (WHERE operacion='INSERT' AND fecha > now() - interval '30 minutes') AS nuevas,\n         (SELECT count(*) FROM ventas) AS total\n  FROM auditoria_datos WHERE tabla='ventas'\n) t;","options":{}},"type":"n8n-nodes-base.postgres","typeVersion":2.6,"position":[160,16],"id":"02c5cecf-2b76-479b-9836-4d6ceda437b9","name":"Detectar D2","credentials":{"postgres":{"id":"KGBDUlLWU9n2TTvZ","name":"Postgres account"}}}],"connections":{"Cada 30 segundos":{"main":[[{"node":"Detectar D2","type":"main","index":0}]]},"Prueba manual":{"main":[[{"node":"Detectar D2","type":"main","index":0}]]},"Hay hallazgo":{"main":[[{"node":"Registrar D2","type":"main","index":0}],[]]},"Registrar D2":{"main":[[{"node":"Enviar D2 a telegram","type":"main","index":0}]]},"Detectar D2":{"main":[[{"node":"Hay hallazgo","type":"main","index":0}]]}},"settings":{"executionOrder":"v1","timezone":"America/Costa_Rica","binaryMode":"separate"},"staticData":null,"meta":{"templateCredsSetupCompleted":true},"nodeGroups":[],"pinData":{},"versionId":"719823cd-4f6d-4605-8d3a-c48552a2de52","activeVersionId":null,"versionCounter":19,"triggerCount":0,"sourceWorkflowId":null,"tags":[],"shared":[{"updatedAt":"2026-11-16T08:42:32.173Z","createdAt":"2026-11-16T08:42:32.173Z","role":"workflow:owner","workflowId":"nutrianimalesD02","projectId":"EqfRyi2VEEMIpO0R","project":{"updatedAt":"2026-11-16T07:32:35.016Z","createdAt":"2026-11-16T03:41:57.038Z","id":"EqfRyi2VEEMIpO0R","name":"Jafet Rojas Carranza <jafetrojascar@gmail.com>","type":"personal","icon":null,"description":null,"customTelemetryTags":[],"creatorId":"9d4bff8e-16c4-4ef7-9328-233a089d14a1"}}],"versionMetadata":{"name":null,"description":null}}]
+{
+  "name": "Nutri D2 — Crecimiento anormal",
+  "nodes": [
+    {
+      "id": "706f72d5-9567-5165-80bd-37728d69ba44",
+      "name": "Cada 30 segundos",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "seconds",
+              "secondsInterval": 30
+            }
+          ]
+        }
+      },
+      "position": [
+        0,
+        0
+      ],
+      "notes": "Agenda de la regla D2. Sondeo periódico, no detección instantánea garantizada.",
+      "notesInFlow": true
+    },
+    {
+      "id": "aeae0485-6434-5f0f-a245-bfbb493c5c1f",
+      "name": "Prueba manual",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "parameters": {},
+      "position": [
+        0,
+        240
+      ],
+      "notes": "Permite ejecutar esta misma regla desde el editor durante QA.",
+      "notesInFlow": true
+    },
+    {
+      "id": "b05bccb3-3a7f-5336-af8d-9199f03e09a5",
+      "name": "Detectar D2",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "parameters": {
+        "method": "POST",
+        "url": "http://monitor:8000/checks/D2",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "position": [
+        260,
+        0
+      ],
+      "notes": "Crecimiento anormal. Fuente: Conteos exactos + historial. Condición: Más de 20% dentro de ventana de 30 minutos. Devuelve evidencia real o un error de fuente no disponible.",
+      "notesInFlow": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REEMPLAZAR_AL_IMPORTAR",
+          "name": "Nutri monitor"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "id": "e96865c4-d51e-5aa4-8884-d003cf263483",
+      "name": "Hay hallazgo",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "D2",
+              "leftValue": "={{ $json.detected }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "position": [
+        520,
+        0
+      ],
+      "notes": "Solo la rama verdadera solicita notificación. Sin hallazgo no se envía Telegram.",
+      "notesInFlow": true
+    },
+    {
+      "id": "ad81e215-918f-572f-b95f-631283261601",
+      "name": "Notificar D2",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "parameters": {
+        "method": "POST",
+        "url": "=http://monitor:8000/notify/{{ $json.event_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "position": [
+        800,
+        0
+      ],
+      "notes": "Invoca una operación fija del monitor. La credencial se importa cifrada en n8n, nunca en este JSON. Reintenta fallos transitorios; la bandeja evita duplicados normales.",
+      "notesInFlow": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REEMPLAZAR_AL_IMPORTAR",
+          "name": "Nutri monitor"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    }
+  ],
+  "connections": {
+    "Cada 30 segundos": {
+      "main": [
+        [
+          {
+            "node": "Detectar D2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prueba manual": {
+      "main": [
+        [
+          {
+            "node": "Detectar D2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detectar D2": {
+      "main": [
+        [
+          {
+            "node": "Hay hallazgo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hay hallazgo": {
+      "main": [
+        [
+          {
+            "node": "Notificar D2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Costa_Rica"
+  },
+  "id": "nutrianimalesD02"
+}
