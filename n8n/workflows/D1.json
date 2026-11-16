@@ -1,1 +1,187 @@
-[{"updatedAt":"2026-11-16T08:25:29.383Z","createdAt":"2026-11-16T05:06:17.382Z","id":"nutrianimalesD01","name":"Nutri D1 — DELETE masivo sin WHERE","description":null,"active":false,"isArchived":false,"nodes":[{"parameters":{"rule":{"interval":[{"field":"seconds"}]}},"id":"706f72d5-9567-5165-80bd-37728d69ba44","name":"Cada 30 segundos","type":"n8n-nodes-base.scheduleTrigger","typeVersion":1.2,"position":[0,0],"notesInFlow":true,"notes":"Agenda de la regla D1. Sondeo periódico, no detección instantánea garantizada."},{"parameters":{},"id":"aeae0485-6434-5f0f-a245-bfbb493c5c1f","name":"Prueba manual","type":"n8n-nodes-base.manualTrigger","typeVersion":1,"position":[0,240],"notesInFlow":true,"notes":"Permite ejecutar esta misma regla desde el editor durante QA."},{"parameters":{"conditions":{"options":{"caseSensitive":{},"leftValue":"","typeValidation":{},"version":{}},"conditions":[{"id":"D1","leftValue":"={{ $json.id }}","rightValue":true,"operator":{"type":"string","operation":"notEmpty","singleValue":true}}],"combinator":"and"},"options":{}},"id":"e96865c4-d51e-5aa4-8884-d003cf263483","name":"Hay hallazgo","type":"n8n-nodes-base.if","typeVersion":2.2,"position":[528,0],"notesInFlow":true,"notes":"Solo la rama verdadera solicita notificación. Sin hallazgo no se envía Telegram."},{"parameters":{"operation":"executeQuery","query":"INSERT INTO alertas_auditoria (tipo, alerta, mensaje, detalles, severidad, huella)\nVALUES ('datos', 'D1', 'DELETE masivo sin WHERE detectado', '{{ JSON.stringify($json) }}'::jsonb, 'alta', 'D1-{{ $json.id }}')\nON CONFLICT (huella) DO NOTHING\nRETURNING id;","options":{}},"type":"n8n-nodes-base.postgres","typeVersion":2.6,"position":[768,-16],"id":"fe342466-f9ee-440d-9f4a-19647df7b7d6","name":"Execute a SQL query1","credentials":{"postgres":{"id":"KGBDUlLWU9n2TTvZ","name":"Postgres account"}}},{"parameters":{"operation":"executeQuery","query":"SELECT id, tabla, usuario, filas, fecha\nFROM auditoria_sentencias\nWHERE operacion='DELETE' AND filas > 100 AND fecha > now() - interval '10 minutes';","options":{}},"type":"n8n-nodes-base.postgres","typeVersion":2.6,"position":[288,64],"id":"3951db6f-a750-4c7c-b5b8-7ecef68a3824","name":"Detectar D1","alwaysOutputData":true,"credentials":{"postgres":{"id":"KGBDUlLWU9n2TTvZ","name":"Postgres account"}}},{"parameters":{"chatId":"-5513672600","text":"=ALERTA CRÍTICA - NutriAnimales S.A. | Lead University BCD 9220 Tipo: DELETE masivo sin WHERE detectado Tabla: {{ $('Detectar D1').item.json.tabla }} Filas eliminadas: {{ $('Detectar D1').item.json.filas }} (umbral: 100) Usuario: {{ $('Detectar D1').item.json.usuario }} Fecha: {{ $('Detectar D1').item.json.fecha }} Severidad: CRÍTICA Acción: Verificar intención. Consultar auditoria_datos para ver valor anterior.","additionalFields":{}},"type":"n8n-nodes-base.telegram","typeVersion":1.2,"position":[976,-16],"id":"e512f486-7fb6-4768-a157-a806f1cfb0f7","name":"Enviar D1 a Telegram","webhookId":"79fe07f8-f4c2-4017-8162-cffd616d6e37","credentials":{"telegramApi":{"id":"bhaFlQSuqTSuV9EE","name":"Telegram account"}}}],"connections":{"Cada 30 segundos":{"main":[[{"node":"Detectar D1","type":"main","index":0}]]},"Prueba manual":{"main":[[{"node":"Detectar D1","type":"main","index":0}]]},"Hay hallazgo":{"main":[[{"node":"Execute a SQL query1","type":"main","index":0}],[]]},"Execute a SQL query1":{"main":[[{"node":"Enviar D1 a Telegram","type":"main","index":0}]]},"Detectar D1":{"main":[[{"node":"Hay hallazgo","type":"main","index":0}]]}},"settings":{"executionOrder":"v1","timezone":"America/Costa_Rica","binaryMode":"separate"},"staticData":null,"meta":{"templateCredsSetupCompleted":true},"nodeGroups":[],"pinData":{},"versionId":"5eb2efd4-759b-4461-9bad-3c324f660eb9","activeVersionId":null,"versionCounter":54,"triggerCount":0,"sourceWorkflowId":null,"tags":[],"shared":[{"updatedAt":"2026-11-16T05:06:17.382Z","createdAt":"2026-11-16T05:06:17.382Z","role":"workflow:owner","workflowId":"nutrianimalesD01","projectId":"EqfRyi2VEEMIpO0R","project":{"updatedAt":"2026-11-16T07:32:35.016Z","createdAt":"2026-11-16T03:41:57.038Z","id":"EqfRyi2VEEMIpO0R","name":"Jafet Rojas Carranza <jafetrojascar@gmail.com>","type":"personal","icon":null,"description":null,"customTelemetryTags":[],"creatorId":"9d4bff8e-16c4-4ef7-9328-233a089d14a1"}}],"versionMetadata":{"name":null,"description":null}}]
+{
+  "name": "Nutri D1 — DELETE masivo sin WHERE",
+  "nodes": [
+    {
+      "id": "706f72d5-9567-5165-80bd-37728d69ba44",
+      "name": "Cada 30 segundos",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "seconds",
+              "secondsInterval": 30
+            }
+          ]
+        }
+      },
+      "position": [
+        0,
+        0
+      ],
+      "notes": "Agenda de la regla D1. Sondeo periódico, no detección instantánea garantizada.",
+      "notesInFlow": true
+    },
+    {
+      "id": "aeae0485-6434-5f0f-a245-bfbb493c5c1f",
+      "name": "Prueba manual",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "parameters": {},
+      "position": [
+        0,
+        240
+      ],
+      "notes": "Permite ejecutar esta misma regla desde el editor durante QA.",
+      "notesInFlow": true
+    },
+    {
+      "id": "54e43e32-5260-5162-8f90-83b704b31f40",
+      "name": "Detectar D1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "parameters": {
+        "method": "POST",
+        "url": "http://monitor:8000/checks/D1",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "position": [
+        260,
+        0
+      ],
+      "notes": "DELETE masivo sin WHERE. Fuente: Trigger de sentencia + AST SQL. Condición: Más de 100 filas por sentencia confirmada. Devuelve evidencia real o un error de fuente no disponible.",
+      "notesInFlow": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REEMPLAZAR_AL_IMPORTAR",
+          "name": "Nutri monitor"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "id": "e96865c4-d51e-5aa4-8884-d003cf263483",
+      "name": "Hay hallazgo",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "D1",
+              "leftValue": "={{ $json.detected }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "position": [
+        520,
+        0
+      ],
+      "notes": "Solo la rama verdadera solicita notificación. Sin hallazgo no se envía Telegram.",
+      "notesInFlow": true
+    },
+    {
+      "id": "a830b17f-e6b7-538d-863e-b5e3b6620b28",
+      "name": "Notificar D1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "parameters": {
+        "method": "POST",
+        "url": "=http://monitor:8000/notify/{{ $json.event_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "position": [
+        800,
+        0
+      ],
+      "notes": "Invoca una operación fija del monitor. La credencial se importa cifrada en n8n, nunca en este JSON. Reintenta fallos transitorios; la bandeja evita duplicados normales.",
+      "notesInFlow": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REEMPLAZAR_AL_IMPORTAR",
+          "name": "Nutri monitor"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    }
+  ],
+  "connections": {
+    "Cada 30 segundos": {
+      "main": [
+        [
+          {
+            "node": "Detectar D1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prueba manual": {
+      "main": [
+        [
+          {
+            "node": "Detectar D1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detectar D1": {
+      "main": [
+        [
+          {
+            "node": "Hay hallazgo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hay hallazgo": {
+      "main": [
+        [
+          {
+            "node": "Notificar D1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Costa_Rica"
+  },
+  "id": "nutrianimalesD01"
+}
