@@ -1,0 +1,297 @@
+Windows PowerShell
+Copyright (C) Microsoft Corporation. All rights reserved.
+
+PS C:\Users\Ruben> git --version
+git version 2.54.0.windows.1
+PS C:\Users\Ruben> git clone --branch feature/integrantes-A_B https://github.com/Julio-Orozco/nutrianimales-security.git "$env:USERPROFILE\Downloads\nutrianimales-parte-e"
+Cloning into 'C:\Users\Ruben\Downloads\nutrianimales-parte-e'...
+remote: Enumerating objects: 250, done.
+remote: Counting objects: 100% (250/250), done.
+remote: Compressing objects: 100% (123/123), done.
+remote: Total 250 (delta 121), reused 235 (delta 106), pack-reused 0 (from 0)
+Receiving objects: 100% (250/250), 148.11 KiB | 90.00 KiB/s, done.
+Resolving deltas: 100% (121/121), done.
+PS C:\Users\Ruben> cd "$env:USERPROFILE\Downloads\nutrianimales-parte-e"
+PS C:\Users\Ruben\Downloads\nutrianimales-parte-e> git -C "$env:USERPROFILE\Downloads\nutrianimales-parte-e" switch -c feature/integrante5-riesgos-rbac
+Switched to a new branch 'feature/integrante5-riesgos-rbac'
+PS C:\Users\Ruben\Downloads\nutrianimales-parte-e> docker version
+Client:
+ Version:           29.8.1
+ API version:       1.56
+ Go version:        go1.26.8
+ Git commit:        4a63305
+ Built:             Tue Sep 15 16:28:39 2026
+ OS/Arch:           windows/amd64
+ Context:           desktop-linux
+
+Server: Docker Desktop 4.93.0 (240920)
+ Engine:
+  Version:          29.8.1
+  API version:      1.56 (minimum version 1.40)
+  Go version:       go1.26.8
+  Git commit:       464cd50
+  Built:            Tue Sep 15 16:25:38 2026
+  OS/Arch:          linux/amd64
+  Experimental:     false
+ containerd:
+  Version:          v2.3.5
+  GitCommit:        1294c24a7da8e5a793ed378161673abe94118892
+ runc:
+  Version:          1.5.1
+  GitCommit:        v1.5.1-0-g8f2685a4
+ docker-init:
+  Version:          0.19.0
+  GitCommit:        de40ad0
+PS C:\Users\Ruben\Downloads\nutrianimales-parte-e> wsl --list --verbose
+  NAME              STATE           VERSION
+* docker-desktop    Running         2
+PS C:\Users\Ruben\Downloads\nutrianimales-parte-e> docker pull postgres:16.14
+16.14: Pulling from library/postgres
+5d59b154e183: Pull complete
+0a30060dfa56: Pull complete
+10e14a8b4766: Pull complete
+26c307b5e35a: Pull complete
+1d943b076b0f: Pull complete
+24ae71c6470d: Pull complete
+21b1510e6796: Pull complete
+6a61619bdfd1: Pull complete
+d015a9a5b43f: Pull complete
+5724f2481726: Pull complete
+c66dedc53722: Pull complete
+bc896de4a313: Pull complete
+bc0701afb397: Pull complete
+572343b36a41: Pull complete
+f4fc570126c2: Download complete
+90ca4e33e012: Download complete
+Digest: sha256:95206741a5b214807675e14165369d05b93a9cf692223b616d07cca227e74b0b
+Status: Downloaded newer image for postgres:16.14
+docker.io/library/postgres:16.14
+PS C:\Users\Ruben\Downloads\nutrianimales-parte-e> & {
+>>     if (Test-Path .env) {
+>>         throw ".env ya existe; no se modificó."
+>>     }
+>>
+>>     $generadorE = [Security.Cryptography.RandomNumberGenerator]::Create()
+>>
+>>     $contenidoE = foreach ($nombreE in @(
+>>         'POSTGRES_PASSWORD', 'MONITOR_PASSWORD', 'AGENTE_IA_PASSWORD',
+>>         'GERENTE_PASSWORD', 'TI_PASSWORD', 'AUDITOR_PASSWORD',
+>>         'BACKUP_PASSWORD', 'N8N_DB_PASSWORD', 'N8N_ENCRYPTION_KEY',
+>>         'PGADMIN_DEFAULT_PASSWORD'
+>>     )) {
+>>         $bytesE = New-Object byte[] 32
+>>         $generadorE.GetBytes($bytesE)
+>>         $nombreE + '=' + ([BitConverter]::ToString($bytesE).Replace('-', '').ToLowerInvariant())
+>>     }
+>>
+>>     $contenidoE += @(
+>>         'PGADMIN_DEFAULT_EMAIL=ti@nutrianimales.test',
+>>         'TELEGRAM_BOT_TOKEN=',
+>>         'GROQ_API_KEY='
+>>     )
+>>
+>>     [IO.File]::WriteAllLines(
+>>         (Join-Path $PWD.Path '.env'),
+>>         [string[]]$contenidoE,
+>>         [Text.UTF8Encoding]::new($false)
+>>     )
+>>
+>>     $generadorE.Dispose()
+>>     Write-Host ".env creado correctamente; las contraseñas no se mostraron."
+>> }
+.env creado correctamente; las contraseñas no se mostraron.
+PS C:\Users\Ruben\Downloads\nutrianimales-parte-e> git check-ignore -v -- .env
+.gitignore:1:.env       .env
+PS C:\Users\Ruben\Downloads\nutrianimales-parte-e> Expand-Archive -LiteralPath "$env:USERPROFILE\Downloads\Soporte_Windows_Parte_E.zip" -DestinationPath $PWD.Path
+PS C:\Users\Ruben\Downloads\nutrianimales-parte-e>
+PS C:\Users\Ruben\Downloads\nutrianimales-parte-e> Test-Path .\compose.parte-e.windows.yaml
+True
+PS C:\Users\Ruben\Downloads\nutrianimales-parte-e> docker compose -p nutrianimales-e -f compose.yaml -f compose.parte-e.windows.yaml config --quiet
+PS C:\Users\Ruben\Downloads\nutrianimales-parte-e> docker compose -p nutrianimales-e -f compose.yaml -f compose.parte-e.windows.yaml up -d --wait --wait-timeout 180 postgres
+[+] up 7/7
+ ✔ Network nutrianimales-e_nutrianimales-net Created                                                                                  0.1s
+ ✔ Volume nutrianimales-e_e_pg_logs          Created                                                                                  0.0s
+ ✔ Volume nutrianimales-e_e_pg_init          Created                                                                                  0.0s
+ ✔ Volume nutrianimales-e_e_pg_tls           Created                                                                                  0.0s
+ ✔ Volume nutrianimales-e_pgdata             Created                                                                                  0.0s
+ ✔ Container nutrianimales-e-preparar-e-1    Exited                                                                                   1.5s
+ ✔ Container nutrianimales_e_db              Healthy                                                                                  6.5s
+PS C:\Users\Ruben\Downloads\nutrianimales-parte-e> docker compose -p nutrianimales-e -f compose.yaml -f compose.parte-e.windows.yaml exec-T postgres psql -X -U postgres -d nutrianimales -v ON_ERROR_STOP=1 -P pager=off -c "SELECT current_database() AS base, current_setting('server_version') AS version; SELECT rolname, rolcanlogin AS login, rolsuper AS superusuario FROM pg_roles WHERE rolname IN ('rol_gerente','rol_ti','rol_auditor','gerente_db','ti_db','auditor_db') ORDER BY rolname;"
+     base      |             version
+---------------+---------------------------------
+ nutrianimales | 16.14 (Debian 16.14-1.pgdg13+1)
+(1 row)
+
+   rolname   | login | superusuario
+-------------+-------+--------------
+ auditor_db  | t     | f
+ gerente_db  | t     | f
+ rol_auditor | f     | f
+ rol_gerente | f     | f
+ rol_ti      | f     | f
+ ti_db       | t     | f
+(6 rows)
+
+PS C:\Users\Ruben\Downloads\nutrianimales-parte-e> docker compose -p nutrianimales-e -f compose.yaml -f compose.parte-e.windows.yaml exec-T postgres psql -X -U postgres -d nutrianimales -v ON_ERROR_STOP=1 -P pager=off -c "SELECT usuario AS cuenta, has_table_privilege(usuario,'public.reporte_ventas','SELECT') AS lee_reportes, has_table_privilege(usuario,'public.auditoria_datos','SELECT') AS lee_auditoria, has_table_privilege(usuario,'public.backups','INSERT') AS registra_backup, has_table_privilege(usuario,'public.auditoria_datos','DELETE') AS borra_auditoria FROM (VALUES ('gerente_db'),('ti_db'),('auditor_db')) AS cuentas(usuario);"
+   cuenta   | lee_reportes | lee_auditoria | registra_backup | borra_auditoria
+------------+--------------+---------------+-----------------+-----------------
+ gerente_db | t            | f             | f               | f
+ ti_db      | t            | t             | t               | f
+ auditor_db | f            | t             | f               | f
+(3 rows)
+
+PS C:\Users\Ruben\Downloads\nutrianimales-parte-e> Expand-Archive -LiteralPath "$env:USERPROFILE\Downloads\Parte_E_Grupo3_Actualizada.zip" -DestinationPath $PWD.Path -Force
+PS C:\Users\Ruben\Downloads\nutrianimales-parte-e>
+PS C:\Users\Ruben\Downloads\nutrianimales-parte-e> powershell -NoProfile -ExecutionPolicy Bypass -File .\parte-e\Ejecutar-E.ps1 -Paso Pruebas
+127.0.0.1:5432 - accepting connections
+PASO Pruebas | SHA256 del archivo ejecutado: 07B87732C8F7AB77B0F81CC4BD5E69C8C72D445CE52B0C31886A1F0505F23D76
+ nutrianimales_e_db Copying C:\Users\Ruben\Downloads\nutrianimales-parte-e\.runtime\parte-e\03_pruebas_rbac.sql to nutrianimales_e_db:/tmp/parte-e-03_pruebas_rbac.sql
+ nutrianimales_e_db Copied C:\Users\Ruben\Downloads\nutrianimales-parte-e\.runtime\parte-e\03_pruebas_rbac.sql to nutrianimales_e_db:/tmp/parte-e-03_pruebas_rbac.sql
+Pager usage is off.
+E03 | PRUEBAS DE AUTORIZACION | si hay un ERROR no controlado, NO declarar aprobado
+BEGIN
+SET
+ operador | rol_evaluado
+----------+--------------
+ postgres | gerente_db
+(1 row)
+
+ grupos_en_reporte_ventas
+--------------------------
+                        4
+(1 row)
+
+DO
+RESET
+psql:/tmp/parte-e-03_pruebas_rbac.sql:18: NOTICE:  PASS | gerente sin acceso a auditoria: permission denied for table auditoria_datos
+SET
+ rol_evaluado | registros_auditables
+--------------+----------------------
+ ti_db        |                    0
+(1 row)
+
+ id |         estado
+----+-------------------------
+  1 | prueba_rbac_no_respaldo
+(1 row)
+
+INSERT 0 1
+DO
+psql:/tmp/parte-e-03_pruebas_rbac.sql:33: NOTICE:  PASS | TI no borra auditoria: permission denied for table auditoria_datos
+RESET
+SET
+ rol_evaluado | registros
+--------------+-----------
+ auditor_db   |         0
+(1 row)
+
+psql:/tmp/parte-e-03_pruebas_rbac.sql:45: NOTICE:  PASS | auditor de solo lectura: permission denied for table auditoria_datos
+DO
+RESET
+SET
+ rol_evaluado | clientes_visibles
+--------------+-------------------
+ agente_ia    |              1500
+(1 row)
+
+DO
+psql:/tmp/parte-e-03_pruebas_rbac.sql:58: NOTICE:  PASS | agente_ia sin INSERT: permission denied for table clientes
+RESET
+ROLLBACK
+FIN E03 | si llegaron hasta aqui sin ERROR, las pruebas de autorizacion terminaron. La fila de backup fue revertida; la secuencia puede haber avanzado.
+FIN: Pruebas termino sin error de ejecucion.
+Evidencia guardada en: C:\Users\Ruben\Downloads\nutrianimales-parte-e\parte-e\evidencias\20261116-141649-634-Pruebas.txt
+PS C:\Users\Ruben\Downloads\nutrianimales-parte-e> powershell -NoProfile -ExecutionPolicy Bypass -File .\parte-e\Ejecutar-E.ps1 -Paso Autenticacion
+127.0.0.1:5432 - accepting connections
+PASO Autenticacion | SHA256 del archivo ejecutado: A1648015297F85758D7B7B702CDD8E38EC9AFDB8D19527F9B23520CCB3835E33
+ nutrianimales_e_db Copying C:\Users\Ruben\Downloads\nutrianimales-parte-e\.runtime\parte-e\04_autenticacion_tls.sh to nutrianimales_e_db:/tmp/parte-e-04_autenticacion_tls.sh
+ nutrianimales_e_db Copied C:\Users\Ruben\Downloads\nutrianimales-parte-e\.runtime\parte-e\04_autenticacion_tls.sh to nutrianimales_e_db:/tmp/parte-e-04_autenticacion_tls.sh
+PASS | login real: gerente_db | session_user=gerente_db | current_user=gerente_db | TLS=TLSv1.3 | verify-full
+PASS | login real: ti_db | session_user=ti_db | current_user=ti_db | TLS=TLSv1.3 | verify-full
+PASS | login real: auditor_db | session_user=auditor_db | current_user=auditor_db | TLS=TLSv1.3 | verify-full
+PASS | clave incorrecta rechazada por PostgreSQL: password authentication failed
+FIN E04 | 3 logins TCP con TLS y 1 rechazo por clave incorrecta comprobados.
+FIN: Autenticacion termino sin error de ejecucion.
+Evidencia guardada en: C:\Users\Ruben\Downloads\nutrianimales-parte-e\parte-e\evidencias\20261116-141930-861-Autenticacion.txt
+PS C:\Users\Ruben\Downloads\nutrianimales-parte-e> powershell -NoProfile -ExecutionPolicy Bypass -File .\parte-e\Ejecutar-E.ps1 -Paso Diagnostico
+127.0.0.1:5432 - accepting connections
+PASO Diagnostico | SHA256 del archivo ejecutado: 6F2197D1D8F63E64E1A20158BABAD138B1A4504E92CD14667199F361CB73FACD
+ nutrianimales_e_db Copying C:\Users\Ruben\Downloads\nutrianimales-parte-e\.runtime\parte-e\01_diagnostico.sql to nutrianimales_e_db:/tmp/parte-e-01_diagnostico.sql
+ nutrianimales_e_db Copied C:\Users\Ruben\Downloads\nutrianimales-parte-e\.runtime\parte-e\01_diagnostico.sql to nutrianimales_e_db:/tmp/parte-e-01_diagnostico.sql
+Pager usage is off.
+E01 | DIAGNOSTICO DE LA BASE | resultado observado, no esperado
+     base      | ejecutor |                                                        motor       |           instante
+---------------+----------+----------------------------------------------------------------------------------------------------------------------+-------------------------------
+ nutrianimales | postgres | PostgreSQL 16.14 (Debian 16.14-1.pgdg13+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0,64-bit | 2026-11-16 14:20:37.572822-06
+(1 row)
+
+        objeto        | existe
+----------------------+--------
+ clientes             | t
+ ventas               | t
+ lotes_produccion     | t
+ auditoria_datos      | t
+ auditoria_sentencias | t
+ backups              | t
+ alertas_auditoria    | t
+ pg_settings_baseline | t
+ reporte_ventas       | t
+ reporte_inventario   | t
+ reporte_produccion   | t
+(11 rows)
+
+   rolname   | rolcanlogin | rolsuper | rolcreatedb | rolcreaterole
+-------------+-------------+----------+-------------+---------------
+ agente_ia   | t           | f        | f           | f
+ auditor_db  | t           | f        | f           | f
+ gerente_db  | t           | f        | f           | f
+ monitor_db  | t           | f        | f           | f
+ n8n_app     | t           | f        | f           | f
+ rol_auditor | f           | f        | f           | f
+ rol_gerente | f           | f        | f           | f
+ rol_ti      | f           | f        | f           | f
+ ti_db       | t           | f        | f           | f
+(9 rows)
+
+   cuenta   |    grupo
+------------+-------------
+ auditor_db | rol_auditor
+ gerente_db | rol_gerente
+ ti_db      | rol_ti
+(3 rows)
+
+ nspname |    propietario
+---------+-------------------
+ public  | pg_database_owner
+ n8n     | n8n_app
+(2 rows)
+
+      tabla       |             tgname             | tgenabled
+------------------+--------------------------------+-----------
+ productos        | trg_auditoria_productos        | O
+ lotes_produccion | trg_auditoria_lotes_produccion | O
+ clientes         | trg_auditoria_clientes         | O
+ ventas           | trg_auditoria_ventas           | O
+(4 rows)
+
+           name           |      setting
+--------------------------+--------------------
+ log_connections          | on
+ password_encryption      | scram-sha-256
+ shared_preload_libraries | pg_stat_statements
+ ssl                      | on
+(4 rows)
+
+ line_number |  type   | database | user_name  | address |  auth_method  | error
+-------------+---------+----------+------------+---------+---------------+-------
+           1 | local   | {all}    | {postgres} |         | trust         |
+           2 | local   | {all}    | {all}      |         | scram-sha-256 |
+           3 | hostssl | {all}    | {all}      | samenet | scram-sha-256 |
+           4 | host    | {all}    | {all}      | 0.0.0.0 | reject        |
+           5 | host    | {all}    | {all}      | ::      | reject        |
+(5 rows)
+
+FIN E01: si faltan objetos/roles, detenerse y pedir correccion al DBA antes de probar E02/E03.
+FIN: Diagnostico termino sin error de ejecucion.
+Evidencia guardada en: C:\Users\Ruben\Downloads\nutrianimales-parte-e\parte-e\evidencias\20261116-142036-917-Diagnostico.txt
+PS C:\Users\Ruben\Downloads\nutrianimales-parte-e>
