@@ -1,137 +1,178 @@
 {
-  "name": "Nutri R3 — Conexión fuera de horario",
+  "name": "Nutri R3 — Conexiones fuera de horario",
   "nodes": [
     {
-      "id": "706f72d5-9567-5165-80bd-37728d69ba44",
-      "name": "Cada 30 segundos",
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.2,
       "parameters": {
         "rule": {
           "interval": [
             {
-              "field": "seconds",
-              "secondsInterval": 30
+              "field": "seconds"
             }
           ]
         }
       },
+      "id": "59d6428c-a3d4-404d-b49c-fcc11c246179",
+      "name": "Cada 30 segundos",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
       "position": [
         0,
         0
       ],
-      "notes": "Agenda de la regla R3. Sondeo periódico, no detección instantánea garantizada.",
-      "notesInFlow": true
+      "notesInFlow": true,
+      "notes": "Agenda de la regla R1. Sondeo periódico, no detección instantánea garantizada."
     },
     {
-      "id": "aeae0485-6434-5f0f-a245-bfbb493c5c1f",
+      "parameters": {},
+      "id": "25b4e9ba-e571-4b0b-ae27-99250944982f",
       "name": "Prueba manual",
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
-      "parameters": {},
       "position": [
         0,
-        240
+        272
       ],
-      "notes": "Permite ejecutar esta misma regla desde el editor durante QA.",
-      "notesInFlow": true
-    },
-    {
-      "id": "899677bb-2b65-514d-af2e-6ae1d310be63",
-      "name": "Detectar R3",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "parameters": {
-        "method": "POST",
-        "url": "http://monitor:8000/checks/R3",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "options": {
-          "timeout": 120000
-        }
-      },
-      "position": [
-        260,
-        0
-      ],
-      "notes": "Conexión fuera de horario. Fuente: pg_stat_activity. Condición: 23:00–06:00 America/Costa_Rica. Devuelve evidencia real o un error de fuente no disponible.",
       "notesInFlow": true,
-      "credentials": {
-        "httpHeaderAuth": {
-          "id": "REEMPLAZAR_AL_IMPORTAR",
-          "name": "Nutri monitor"
-        }
-      },
-      "retryOnFail": true,
-      "maxTries": 3,
-      "waitBetweenTries": 2000
+      "notes": "Permite ejecutar esta misma regla desde el editor durante QA."
     },
     {
-      "id": "e96865c4-d51e-5aa4-8884-d003cf263483",
-      "name": "Hay hallazgo",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.2,
       "parameters": {
         "conditions": {
           "options": {
-            "caseSensitive": true,
+            "caseSensitive": {},
             "leftValue": "",
-            "typeValidation": "strict",
-            "version": 2
+            "typeValidation": {},
+            "version": {}
           },
           "conditions": [
             {
-              "id": "R3",
-              "leftValue": "={{ $json.detected }}",
+              "id": "R1",
+              "leftValue": "={{ $json.pid }}",
               "rightValue": true,
               "operator": {
-                "type": "boolean",
-                "operation": "true",
+                "type": "string",
+                "operation": "notEmpty",
                 "singleValue": true
               }
             }
           ],
           "combinator": "and"
-        }
+        },
+        "options": {}
       },
+      "id": "d0d2dcc8-aee3-4b29-8452-31807a82e330",
+      "name": "Hay hallazgo",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
       "position": [
-        520,
+        528,
         0
       ],
-      "notes": "Solo la rama verdadera solicita notificación. Sin hallazgo no se envía Telegram.",
-      "notesInFlow": true
+      "notesInFlow": true,
+      "notes": "Solo la rama verdadera solicita notificación. Sin hallazgo no se envía Telegram."
     },
     {
-      "id": "f8368fb6-8724-5934-82a0-6bf785752696",
-      "name": "Notificar R3",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
       "parameters": {
-        "method": "POST",
-        "url": "=http://monitor:8000/notify/{{ $json.event_id }}",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "options": {
-          "timeout": 120000
-        }
+        "conditions": {
+          "options": {
+            "caseSensitive": {},
+            "leftValue": "",
+            "typeValidation": {},
+            "version": {}
+          },
+          "conditions": [
+            {
+              "id": "9e66e48e-16da-4756-8bbd-67d71b8ecdf1",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
       },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
       "position": [
-        800,
+        352,
+        144
+      ],
+      "id": "2d7bd333-618d-4753-b665-9df41b46328a",
+      "name": "Es alerta nueva?"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  pid,\n  usename,\n  application_name,\n  client_addr::text AS ip,\n  backend_start,\n  EXTRACT(HOUR FROM backend_start AT TIME ZONE 'America/Costa_Rica')::int AS hora_cr\nFROM pg_stat_activity\nWHERE backend_type = 'client backend'\n  AND usename NOT IN ('monitor_db', 'postgres')\n  AND (\n    EXTRACT(HOUR FROM backend_start AT TIME ZONE 'America/Costa_Rica') >= 23\n    OR EXTRACT(HOUR FROM backend_start AT TIME ZONE 'America/Costa_Rica') < 6\n  );",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        208,
         0
       ],
-      "notes": "Invoca una operación fija del monitor. La credencial se importa cifrada en n8n, nunca en este JSON. Reintenta fallos transitorios; la bandeja evita duplicados normales.",
-      "notesInFlow": true,
+      "id": "2a35c2ca-54d3-4496-98b2-3ac84680a5a5",
+      "name": "Detectar R3",
+      "alwaysOutputData": true,
       "credentials": {
-        "httpHeaderAuth": {
-          "id": "REEMPLAZAR_AL_IMPORTAR",
-          "name": "Nutri monitor"
+        "postgres": {
+          "id": "1Cx22i0z55yy8wXL",
+          "name": "Nutri Postgres monitor_db"
         }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO alertas_auditoria (tipo, alerta, mensaje, detalles, severidad, huella)\nVALUES (\n  'seguridad',\n  'R3',\n  'Conexión fuera de horario laboral (23:00–06:00 CR)',\n  '{{ JSON.stringify($json) }}'::jsonb,\n  'media',\n  'R3-{{ $json.pid }}-{{ $json.backend_start }}'\n)\nON CONFLICT (huella) DO NOTHING\nRETURNING id;",
+        "options": {}
       },
-      "retryOnFail": true,
-      "maxTries": 3,
-      "waitBetweenTries": 2000
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        144,
+        144
+      ],
+      "id": "d4d31fff-3fc9-483c-a6ff-b31f4ba561d2",
+      "name": "Registrar alerta R3",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "1Cx22i0z55yy8wXL",
+          "name": "Nutri Postgres monitor_db"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "-5513672600",
+        "text": "=🚨 *ALERTA R3 — Conexión fuera de horario* • ID evento: {{ $json.id }} • Usuario: {{ $('Detectar R3').item.json.usename }} • App: {{ $('Detectar R3').item.json.application_name }} • Hora (CR): {{ $('Detectar R3').item.json.hora_cr }}h • PID: {{ $('Detectar R3').item.json.pid }}\n",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        656,
+        144
+      ],
+      "id": "11b53d8b-a30f-42f6-b565-e4525251a355",
+      "name": "Enviar alerta R3",
+      "webhookId": "cf6108f9-805a-4bf5-bf94-176f7c474894",
+      "credentials": {
+        "telegramApi": {
+          "id": "buC8KFqNgkVUsSoI",
+          "name": "Nutri Telegram bot"
+        }
+      }
     }
   ],
+  "pinData": {},
   "connections": {
     "Cada 30 segundos": {
       "main": [
@@ -155,6 +196,28 @@
         ]
       ]
     },
+    "Hay hallazgo": {
+      "main": [
+        [
+          {
+            "node": "Registrar alerta R3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Es alerta nueva?": {
+      "main": [
+        [
+          {
+            "node": "Enviar alerta R3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Detectar R3": {
       "main": [
         [
@@ -166,21 +229,30 @@
         ]
       ]
     },
-    "Hay hallazgo": {
+    "Registrar alerta R3": {
       "main": [
         [
           {
-            "node": "Notificar R3",
+            "node": "Es alerta nueva?",
             "type": "main",
             "index": 0
           }
-        ],
-        []
+        ]
       ]
     }
   },
+  "active": false,
   "settings": {
     "executionOrder": "v1",
-    "timezone": "America/Costa_Rica"
-  }
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "60389851-f396-4d61-a5aa-0c6d55b2852a",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "e59ebbaf3db5880c93bb1012846c792a2332815d03ff00026d455885dc224d06"
+  },
+  "nodeGroups": [],
+  "id": "mOwlUMW0HR9iJVGt",
+  "tags": []
 }
