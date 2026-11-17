@@ -1,0 +1,50 @@
+# Complemento del compose.yaml del equipo; usar ambos archivos con -f.
+# Solo se inicia el servicio postgres y su preparación al solicitar `up postgres`.
+services:
+  preparar-e:
+    # La misma imagen contiene Bash, OpenSSL y el usuario postgres.
+    image: postgres:16.14
+    # Root se limita al contenedor temporal que prepara propietarios y permisos.
+    user: "0:0"
+    restart: "no"
+    # La preparación solo usa archivos locales, sin acceso a la red.
+    network_mode: "none"
+    entrypoint: ["bash", "-euo", "pipefail", "-c"]
+    command:
+      # $$ conserva el signo $ para sed durante la interpolación de Compose.
+      # Se normaliza CRLF antes de ejecutar Bash, incluso tras un checkout Windows.
+      - |
+        sed 's/\r$$//' /soporte/preparar-volumenes.sh | bash -euo pipefail
+    volumes:
+      # Los originales se leen; las copias compatibles van a volúmenes Linux.
+      - ./db/sql:/entrada/sql:ro
+      - ./parte-e/windows:/soporte:ro
+      - e_pg_init:/salida/init
+      - e_pg_tls:/salida/tls
+      - e_pg_logs:/salida/logs
+
+  postgres:
+    # Nombre distinto para no colisionar con el entorno de otros integrantes.
+    container_name: nutrianimales_e_db
+    # Compose combina volúmenes por destino: estos sustituyen los tres bind mounts.
+    # Los demás montajes, credenciales y opciones siguen siendo los del equipo.
+    volumes:
+      - e_pg_init:/docker-entrypoint-initdb.d:ro
+      - e_pg_tls:/run/pg-tls:ro
+      - e_pg_logs:/var/log/postgresql
+    depends_on:
+      preparar-e:
+        condition: service_completed_successfully
+    healthcheck:
+      # TCP evita marcar sano al servidor temporal usado durante initdb.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d nutrianimales"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 10s
+
+# Docker administra estos volúmenes con permisos Linux dentro de su máquina virtual.
+volumes:
+  e_pg_init:
+  e_pg_tls:
+  e_pg_logs:
