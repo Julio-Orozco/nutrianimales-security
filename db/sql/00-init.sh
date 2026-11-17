@@ -12,3 +12,6 @@ done
 
 psql -v ON_ERROR_STOP=1 --username postgres --dbname nutrianimales \
   -v n8n_password="$N8N_DB_PASSWORD" -f /docker-entrypoint-initdb.d/06-n8n.sqb
+
+psql -v ON_ERROR_STOP=1 --username postgres --dbname nutrianimales \
+  -f /docker-entrypoint-initdb.d/07-alertas.sqb

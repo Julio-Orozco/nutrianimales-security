@@ -1,11 +1,9 @@
 {
-  "name": "Nutri D1 — DELETE masivo sin WHERE",
+  "id": "nutriD1alerta00",
+  "name": "Nutri D1 — DELETE masivo sin WHERE en tabla crítica",
+  "active": true,
   "nodes": [
     {
-      "id": "706f72d5-9567-5165-80bd-37728d69ba44",
-      "name": "Cada 30 segundos",
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.2,
       "parameters": {
         "rule": {
           "interval": [
@@ -16,120 +14,197 @@
           ]
         }
       },
+      "id": "cada-30-segundos",
+      "name": "Cada 30 segundos",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
       "position": [
         0,
         0
       ],
-      "notes": "Agenda de la regla D1. Sondeo periódico, no detección instantánea garantizada.",
+      "notes": "Sondeo periódico de la regla D1.",
       "notesInFlow": true
     },
     {
-      "id": "aeae0485-6434-5f0f-a245-bfbb493c5c1f",
+      "parameters": {},
+      "id": "prueba-manual",
       "name": "Prueba manual",
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
-      "parameters": {},
       "position": [
         0,
-        240
+        200
       ],
-      "notes": "Permite ejecutar esta misma regla desde el editor durante QA.",
+      "notes": "Ejecutar la regla a mano desde el editor.",
       "notesInFlow": true
     },
     {
-      "id": "54e43e32-5260-5162-8f90-83b704b31f40",
-      "name": "Detectar D1",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
       "parameters": {
-        "method": "POST",
-        "url": "http://monitor:8000/checks/D1",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "options": {
-          "timeout": 120000
-        }
+        "operation": "executeQuery",
+        "query": "WITH s AS (\n  SELECT 'D1-as-' || id AS huella, tabla, usuario, filas, left(regexp_replace(consulta, '\\s+', ' ', 'g'), 200) AS consulta\n  FROM auditoria_sentencias\n  WHERE operacion = 'DELETE' AND filas > 100 AND fecha > now() - interval '10 minutes'\n  UNION ALL\n  SELECT 'D1-pss-' || p.queryid || '-' || p.calls || '-' || (SELECT extract(epoch FROM stats_reset)::bigint FROM pg_stat_statements_info), substring(p.query from '(?i)DELETE\\s+FROM\\s+(\\S+)'), r.rolname,\n         p.rows / p.calls, left(regexp_replace(p.query, '\\s+', ' ', 'g'), 200)\n  FROM pg_stat_statements p JOIN pg_roles r ON r.oid = p.userid\n  WHERE p.query ~* '^\\s*DELETE' AND p.rows / p.calls > 100\n    AND p.query !~* '\\m(lotes_produccion|ventas|clientes|productos)\\M'\n    AND r.rolname NOT IN ('monitor_db', 'n8n_app')\n)\nSELECT huella, tabla, usuario, filas, consulta,\n       format(E'Tabla: %s\\nFilas eliminadas: %s (umbral: 100)\\nQuery: %s\\nSin WHERE: %s\\nUsuario: %s',\n              tabla, filas, consulta, CASE WHEN consulta ~* '\\mWHERE\\M' THEN 'no' ELSE 'SÍ' END, usuario) AS texto\nFROM s;",
+        "options": {}
       },
+      "id": "detectar",
+      "name": "Detectar D1",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
       "position": [
-        260,
-        0
+        240,
+        100
       ],
-      "notes": "DELETE masivo sin WHERE. Fuente: Trigger de sentencia + AST SQL. Condición: Más de 100 filas por sentencia confirmada. Devuelve evidencia real o un error de fuente no disponible.",
-      "notesInFlow": true,
       "credentials": {
-        "httpHeaderAuth": {
-          "id": "REEMPLAZAR_AL_IMPORTAR",
-          "name": "Nutri monitor"
+        "postgres": {
+          "id": "__CRED_MONITOR__",
+          "name": "Nutri Postgres monitor_db"
         }
       },
-      "retryOnFail": true,
-      "maxTries": 3,
-      "waitBetweenTries": 2000
+      "notes": "Fuente: auditoria_sentencias (trigger por sentencia) + pg_stat_statements",
+      "notesInFlow": true
     },
     {
-      "id": "e96865c4-d51e-5aa4-8884-d003cf263483",
-      "name": "Hay hallazgo",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.2,
       "parameters": {
         "conditions": {
           "options": {
             "caseSensitive": true,
             "leftValue": "",
-            "typeValidation": "strict",
+            "typeValidation": "loose",
             "version": 2
           },
           "conditions": [
             {
-              "id": "D1",
-              "leftValue": "={{ $json.detected }}",
-              "rightValue": true,
+              "id": "c1",
+              "leftValue": "={{ $json.huella }}",
+              "rightValue": "",
               "operator": {
-                "type": "boolean",
-                "operation": "true",
+                "type": "string",
+                "operation": "notEmpty",
                 "singleValue": true
               }
             }
           ],
           "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "-hay-hallazgo-",
+      "name": "¿Hay hallazgo?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        480,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO alertas_auditoria (tipo, alerta, mensaje, detalles, severidad, huella)\nVALUES ('datos', 'D1', 'DELETE masivo sin WHERE en tabla crítica', $1::jsonb, 'critica', $2)\nON CONFLICT (huella) DO UPDATE SET intentos = alertas_auditoria.intentos\n  WHERE alertas_auditoria.estado = 'pendiente'\nRETURNING id::text AS id;",
+        "options": {
+          "queryReplacement": "={{ [ JSON.stringify($json), $json.huella ] }}"
         }
       },
+      "id": "registrar",
+      "name": "Registrar alerta D1",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
       "position": [
-        520,
-        0
+        720,
+        100
       ],
-      "notes": "Solo la rama verdadera solicita notificación. Sin hallazgo no se envía Telegram.",
+      "credentials": {
+        "postgres": {
+          "id": "__CRED_MONITOR__",
+          "name": "Nutri Postgres monitor_db"
+        }
+      },
+      "notes": "La huella UNIQUE evita repetir un hallazgo ya enviado; si quedó pendiente (falló Telegram) se reintenta.",
       "notesInFlow": true
     },
     {
-      "id": "a830b17f-e6b7-538d-863e-b5e3b6620b28",
-      "name": "Notificar D1",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
       "parameters": {
-        "method": "POST",
-        "url": "=http://monitor:8000/notify/{{ $json.event_id }}",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "options": {
-          "timeout": 120000
-        }
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
       },
+      "id": "-alerta-nueva-",
+      "name": "¿Alerta nueva?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
       "position": [
-        800,
-        0
-      ],
-      "notes": "Invoca una operación fija del monitor. La credencial se importa cifrada en n8n, nunca en este JSON. Reintenta fallos transitorios; la bandeja evita duplicados normales.",
-      "notesInFlow": true,
-      "credentials": {
-        "httpHeaderAuth": {
-          "id": "REEMPLAZAR_AL_IMPORTAR",
-          "name": "Nutri monitor"
+        960,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "__TELEGRAM_CHAT_ID__",
+        "text": "=<b>ALERTA CRÍTICA - NutriAnimales S.A. | Lead University BCD 9220</b>\n<b>Alerta:</b> D1 — DELETE masivo sin WHERE en tabla crítica\n<b>Fecha:</b> {{ $now.setZone('America/Costa_Rica').toFormat('yyyy-MM-dd HH:mm:ss') }}\n{{ $('Detectar D1').item.json.texto.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }}\n<b>Severidad:</b> CRÍTICA\n<b>Acción:</b> Verificar intención. Consultar auditoria_datos (valor_antes) para recuperar las filas eliminadas.\n<i>Registro: alertas_auditoria {{ $('Registrar alerta D1').item.json.id }}</i>",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
         }
       },
-      "retryOnFail": true,
-      "maxTries": 3,
-      "waitBetweenTries": 2000
+      "id": "enviar-telegram",
+      "name": "Enviar alerta D1",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1200,
+        100
+      ],
+      "webhookId": "nutri-D1-telegram",
+      "credentials": {
+        "telegramApi": {
+          "id": "__CRED_TELEGRAM__",
+          "name": "Nutri Telegram bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE alertas_auditoria\nSET estado = 'enviada', enviada_en = now(), intentos = intentos + 1\nWHERE id = $1::uuid;",
+        "options": {
+          "queryReplacement": "={{ [ $('Registrar alerta D1').item.json.id ] }}"
+        }
+      },
+      "id": "marcar-enviada",
+      "name": "Marcar enviada D1",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1440,
+        100
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "__CRED_MONITOR__",
+          "name": "Nutri Postgres monitor_db"
+        }
+      },
+      "notes": "Deja constancia de la entrega en alertas_auditoria.",
+      "notesInFlow": true
     }
   ],
   "connections": {
@@ -159,23 +234,55 @@
       "main": [
         [
           {
-            "node": "Hay hallazgo",
+            "node": "¿Hay hallazgo?",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Hay hallazgo": {
+    "Enviar alerta D1": {
       "main": [
         [
           {
-            "node": "Notificar D1",
+            "node": "Marcar enviada D1",
             "type": "main",
             "index": 0
           }
-        ],
-        []
+        ]
+      ]
+    },
+    "¿Hay hallazgo?": {
+      "main": [
+        [
+          {
+            "node": "Registrar alerta D1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registrar alerta D1": {
+      "main": [
+        [
+          {
+            "node": "¿Alerta nueva?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Alerta nueva?": {
+      "main": [
+        [
+          {
+            "node": "Enviar alerta D1",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     }
   },
@@ -183,5 +290,6 @@
     "executionOrder": "v1",
     "timezone": "America/Costa_Rica"
   },
-  "id": "nutrianimalesD01"
+  "pinData": {},
+  "tags": []
 }

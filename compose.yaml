@@ -52,7 +52,14 @@ services:
       - NODE_EXTRA_CA_CERTS=/run/pg-ca/server.crt
       - DB_POSTGRESDB_SSL_REJECT_UNAUTHORIZED=true
       - DB_POSTGRESDB_SCHEMA=n8n
-      - N8N_LOG_LEVEL=debug
+      # info: los logs no registran variables ni detalles internos (sección 9.2).
+      - N8N_LOG_LEVEL=info
+      - GENERIC_TIMEZONE=America/Costa_Rica
+      - TZ=America/Costa_Rica
+      - N8N_DIAGNOSTICS_ENABLED=false
+      - N8N_PERSONALIZATION_ENABLED=false
+      - EXECUTIONS_DATA_PRUNE=true
+      - EXECUTIONS_DATA_MAX_AGE=72
     volumes:
       - n8n_data:/home/node/.n8n
       - ./infra/postgres-tls/server.crt:/run/pg-ca/server.crt:ro
@@ -64,7 +71,7 @@ services:
         condition: service_healthy
 
   nginx:
-    image: nginx:latest
+    image: nginx:1.31.3
     container_name: nutrianimales_nginx
     restart: unless-stopped
     ports:
@@ -99,13 +106,16 @@ services:
       - "4"
     volumes:
       - ./infra/logging/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
-      - /var/log/ufw.log:/var/log/ufw.log:ro
+      # Se monta /var/log completo (solo lectura): montar un archivo inexistente
+      # hacía que Docker creara /var/log/ufw.log como DIRECTORIO.
+      - /var/log:/var/log/host:ro
     networks:
       - nutrianimales-net
     command: filebeat -e -strict.perms=false -E path.data=/tmp/filebeat
 
 networks:
   nutrianimales-net:
+    name: nutrianimales-net
     driver: bridge
 
 volumes:

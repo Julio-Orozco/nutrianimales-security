@@ -1,17 +1,20 @@
 {
-  "name": "Nutri H3 — Permisos indebidos a agente_ia",
+  "id": "nutriH3alerta00",
+  "name": "Nutri H3 — GRANT de permisos a usuario agente_ia",
+  "active": true,
   "nodes": [
     {
       "parameters": {
         "rule": {
           "interval": [
             {
-              "field": "seconds"
+              "field": "seconds",
+              "secondsInterval": 30
             }
           ]
         }
       },
-      "id": "650aac76-10b9-424a-8d9f-b2ee413efe6a",
+      "id": "cada-30-segundos",
       "name": "Cada 30 segundos",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
@@ -19,36 +22,59 @@
         0,
         0
       ],
-      "notesInFlow": true,
-      "notes": "Agenda de la regla R1. Sondeo periódico, no detección instantánea garantizada."
+      "notes": "Sondeo periódico de la regla H3.",
+      "notesInFlow": true
     },
     {
       "parameters": {},
-      "id": "60d2676c-5517-4d46-8e83-e56d8f045f8d",
+      "id": "prueba-manual",
       "name": "Prueba manual",
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
       "position": [
         0,
-        272
+        200
       ],
-      "notesInFlow": true,
-      "notes": "Permite ejecutar esta misma regla desde el editor durante QA."
+      "notes": "Ejecutar la regla a mano desde el editor.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH est AS (SELECT security_snapshot()->'privilegios_agente' AS p),\nev AS (\n  SELECT e.id, e.fecha, e.detalle\n  FROM eventos_seguridad e\n  WHERE e.fuente = 'postgresql' AND e.tipo = 'GRANT'\n    AND e.detalle->>'sentencia' ~* 'agente_ia'\n    AND e.fecha > now() - interval '10 minutes'\n)\nSELECT 'H3-ev-' || ev.id AS huella, ev.detalle->>'usuario' AS ejecutor,\n       format(E'Evento: GRANT sobre agente_ia\\nEjecutado por: %s (IP %s) a las %s\\nSentencia: %s\\nTablas con escritura ahora: %s\\nRoles heredados: %s',\n              ev.detalle->>'usuario', ev.detalle->>'ip', to_char(ev.fecha, 'HH24:MI:SS'), left(ev.detalle->>'sentencia', 200),\n              left(coalesce((SELECT string_agg(x, ', ') FROM jsonb_array_elements_text(est.p->'escritura') x), 'ninguna'), 250),\n              coalesce((SELECT string_agg(x, ', ') FROM jsonb_array_elements_text(est.p->'miembro_de') x), 'ninguno')) AS texto\nFROM ev, est\nUNION ALL\nSELECT 'H3-estado-' || md5(est.p::text) || '-' || to_char(now(), 'YYYYMMDD'), NULL,\n       format(E'agente_ia tiene privilegios fuera de solo lectura\\nTablas con escritura: %s\\nRoles heredados: %s\\nsuperuser=%s createrole=%s createdb=%s create_schema=%s',\n              left(coalesce((SELECT string_agg(x, ', ') FROM jsonb_array_elements_text(est.p->'escritura') x), 'ninguna'), 250),\n              coalesce((SELECT string_agg(x, ', ') FROM jsonb_array_elements_text(est.p->'miembro_de') x), 'ninguno'),\n              est.p->>'superuser', est.p->>'createrole', est.p->>'createdb', est.p->>'create_schema')\nFROM est\nWHERE ((est.p->>'superuser')::boolean OR (est.p->>'createrole')::boolean OR (est.p->>'createdb')::boolean\n       OR (est.p->>'create_schema')::boolean OR jsonb_array_length(est.p->'escritura') > 0\n       OR jsonb_array_length(est.p->'miembro_de') > 0)\n  AND NOT EXISTS (SELECT 1 FROM ev);",
+        "options": {}
+      },
+      "id": "detectar",
+      "name": "Detectar H3",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        240,
+        100
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "__CRED_MONITOR__",
+          "name": "Nutri Postgres monitor_db"
+        }
+      },
+      "notes": "Fuente: Event trigger trg_evento_grant + pg_roles/role grants (security_snapshot)",
+      "notesInFlow": true
     },
     {
       "parameters": {
         "conditions": {
           "options": {
-            "caseSensitive": {},
+            "caseSensitive": true,
             "leftValue": "",
-            "typeValidation": {},
-            "version": {}
+            "typeValidation": "loose",
+            "version": 2
           },
           "conditions": [
             {
-              "id": "R1",
-              "leftValue": "={{ $json.privilegios }}",
-              "rightValue": true,
+              "id": "c1",
+              "leftValue": "={{ $json.huella }}",
+              "rightValue": "",
               "operator": {
                 "type": "string",
                 "operation": "notEmpty",
@@ -58,31 +84,55 @@
           ],
           "combinator": "and"
         },
+        "looseTypeValidation": true,
         "options": {}
       },
-      "id": "22511532-84f1-4141-96b8-cae92296cdfb",
-      "name": "Hay hallazgo",
+      "id": "-hay-hallazgo-",
+      "name": "¿Hay hallazgo?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        528,
-        0
+        480,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO alertas_auditoria (tipo, alerta, mensaje, detalles, severidad, huella)\nVALUES ('hardening', 'H3', 'GRANT de permisos a usuario agente_ia', $1::jsonb, 'critica', $2)\nON CONFLICT (huella) DO UPDATE SET intentos = alertas_auditoria.intentos\n  WHERE alertas_auditoria.estado = 'pendiente'\nRETURNING id::text AS id;",
+        "options": {
+          "queryReplacement": "={{ [ JSON.stringify($json), $json.huella ] }}"
+        }
+      },
+      "id": "registrar",
+      "name": "Registrar alerta H3",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        720,
+        100
       ],
-      "notesInFlow": true,
-      "notes": "Solo la rama verdadera solicita notificación. Sin hallazgo no se envía Telegram."
+      "credentials": {
+        "postgres": {
+          "id": "__CRED_MONITOR__",
+          "name": "Nutri Postgres monitor_db"
+        }
+      },
+      "notes": "La huella UNIQUE evita repetir un hallazgo ya enviado; si quedó pendiente (falló Telegram) se reintenta.",
+      "notesInFlow": true
     },
     {
       "parameters": {
         "conditions": {
           "options": {
-            "caseSensitive": {},
+            "caseSensitive": true,
             "leftValue": "",
-            "typeValidation": {},
-            "version": {}
+            "typeValidation": "loose",
+            "version": 2
           },
           "conditions": [
             {
-              "id": "9e66e48e-16da-4756-8bbd-67d71b8ecdf1",
+              "id": "c1",
               "leftValue": "={{ $json.id }}",
               "rightValue": "",
               "operator": {
@@ -94,85 +144,69 @@
           ],
           "combinator": "and"
         },
+        "looseTypeValidation": true,
         "options": {}
       },
+      "id": "-alerta-nueva-",
+      "name": "¿Alerta nueva?",
       "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
+      "typeVersion": 2.2,
       "position": [
-        352,
-        144
-      ],
-      "id": "2f1079c7-61b9-46c2-bde4-6707e1b350d6",
-      "name": "Es alerta nueva?"
+        960,
+        100
+      ]
     },
     {
       "parameters": {
-        "operation": "executeQuery",
-        "query": "WITH priv AS (\n  SELECT security_snapshot() -> 'privilegios_agente' AS p\n)\nSELECT\n  p AS privilegios,\n  (p->>'superuser')::boolean AS superuser,\n  (p->>'createrole')::boolean AS createrole,\n  (p->>'createdb')::boolean AS createdb,\n  (p->>'create_schema')::boolean AS create_schema,\n  p->'escritura' AS escritura\nFROM priv\nWHERE (p->>'superuser')::boolean\n   OR (p->>'createrole')::boolean\n   OR (p->>'createdb')::boolean\n   OR (p->>'create_schema')::boolean\n   OR jsonb_array_length(p->'escritura') > 0;",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.6,
-      "position": [
-        208,
-        0
-      ],
-      "id": "9c299b08-08b1-478d-9db8-329678432ad3",
-      "name": "Detectar H3",
-      "alwaysOutputData": true,
-      "credentials": {
-        "postgres": {
-          "id": "1Cx22i0z55yy8wXL",
-          "name": "Nutri Postgres monitor_db"
+        "chatId": "__TELEGRAM_CHAT_ID__",
+        "text": "=<b>ALERTA CRÍTICA - NutriAnimales S.A. | Lead University BCD 9220</b>\n<b>Alerta:</b> H3 — GRANT de permisos a usuario agente_ia\n<b>Fecha:</b> {{ $now.setZone('America/Costa_Rica').toFormat('yyyy-MM-dd HH:mm:ss') }}\n{{ $('Detectar H3').item.json.texto.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }}\n<b>Severidad:</b> CRÍTICA\n<b>Acción:</b> Revocar de inmediato (REVOKE ... FROM agente_ia) e investigar quién ejecutó el GRANT.\n<i>Registro: alertas_auditoria {{ $('Registrar alerta H3').item.json.id }}</i>",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
         }
-      }
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "INSERT INTO alertas_auditoria (tipo, alerta, mensaje, detalles, severidad, huella)\nVALUES (\n  'hardening',\n  'H3',\n  'Permisos indebidos otorgados al rol agente_ia',\n  '{{ JSON.stringify($json) }}'::jsonb,\n  'alta',\n  'H3-{{ JSON.stringify($json.escritura) }}-{{ $json.superuser }}'\n)\nON CONFLICT (huella) DO NOTHING\nRETURNING id;",
-        "options": {}
       },
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.6,
-      "position": [
-        144,
-        144
-      ],
-      "id": "3714bef5-61fb-42b7-b8d4-2d4c1fc4e3db",
-      "name": "Registrar alerta H3",
-      "alwaysOutputData": true,
-      "credentials": {
-        "postgres": {
-          "id": "1Cx22i0z55yy8wXL",
-          "name": "Nutri Postgres monitor_db"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "chatId": "-5513672600",
-        "text": "=🚨 *ALERTA H3 — Permisos indebidos a agente_ia*\n• ID evento: {{ $json.id }}\n• Escritura: `{{ JSON.stringify($('Detectar H3').item.json.escritura) }}`\n• Admin: superuser={{ $('Detectar H3').item.json.superuser }}, create_schema={{ $('Detectar H3').item.json.create_schema }}\n",
-        "additionalFields": {}
-      },
+      "id": "enviar-telegram",
+      "name": "Enviar alerta H3",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
-        656,
-        144
+        1200,
+        100
       ],
-      "id": "919786e0-a0c2-45b6-928a-21e7336a368b",
-      "name": "Enviar alerta H3",
-      "webhookId": "9dbabad9-a224-4989-b17b-ede79f42c303",
+      "webhookId": "nutri-H3-telegram",
       "credentials": {
         "telegramApi": {
-          "id": "buC8KFqNgkVUsSoI",
+          "id": "__CRED_TELEGRAM__",
           "name": "Nutri Telegram bot"
         }
       }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE alertas_auditoria\nSET estado = 'enviada', enviada_en = now(), intentos = intentos + 1\nWHERE id = $1::uuid;",
+        "options": {
+          "queryReplacement": "={{ [ $('Registrar alerta H3').item.json.id ] }}"
+        }
+      },
+      "id": "marcar-enviada",
+      "name": "Marcar enviada H3",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1440,
+        100
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "__CRED_MONITOR__",
+          "name": "Nutri Postgres monitor_db"
+        }
+      },
+      "notes": "Deja constancia de la entrega en alertas_auditoria.",
+      "notesInFlow": true
     }
   ],
-  "pinData": {},
   "connections": {
     "Cada 30 segundos": {
       "main": [
@@ -196,7 +230,29 @@
         ]
       ]
     },
-    "Hay hallazgo": {
+    "Detectar H3": {
+      "main": [
+        [
+          {
+            "node": "¿Hay hallazgo?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar alerta H3": {
+      "main": [
+        [
+          {
+            "node": "Marcar enviada H3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Hay hallazgo?": {
       "main": [
         [
           {
@@ -207,7 +263,18 @@
         ]
       ]
     },
-    "Es alerta nueva?": {
+    "Registrar alerta H3": {
+      "main": [
+        [
+          {
+            "node": "¿Alerta nueva?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Alerta nueva?": {
       "main": [
         [
           {
@@ -217,42 +284,12 @@
           }
         ]
       ]
-    },
-    "Detectar H3": {
-      "main": [
-        [
-          {
-            "node": "Hay hallazgo",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Registrar alerta H3": {
-      "main": [
-        [
-          {
-            "node": "Es alerta nueva?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
     }
   },
-  "active": false,
   "settings": {
     "executionOrder": "v1",
-    "binaryMode": "separate",
-    "availableInMCP": false
+    "timezone": "America/Costa_Rica"
   },
-  "versionId": "a5c6fc25-ab10-454f-9f80-c7c0fadfda82",
-  "meta": {
-    "templateCredsSetupCompleted": true,
-    "instanceId": "e59ebbaf3db5880c93bb1012846c792a2332815d03ff00026d455885dc224d06"
-  },
-  "nodeGroups": [],
-  "id": "Ird6UUran9YKMG7H",
+  "pinData": {},
   "tags": []
 }

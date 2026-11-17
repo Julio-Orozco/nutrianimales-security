@@ -1,17 +1,20 @@
 {
+  "id": "nutriR1alerta00",
   "name": "Nutri R1 — Consulta lenta",
+  "active": true,
   "nodes": [
     {
       "parameters": {
         "rule": {
           "interval": [
             {
-              "field": "seconds"
+              "field": "seconds",
+              "secondsInterval": 30
             }
           ]
         }
       },
-      "id": "39c689a3-0712-46eb-a39a-e44993c5838d",
+      "id": "cada-30-segundos",
       "name": "Cada 30 segundos",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
@@ -19,36 +22,59 @@
         0,
         0
       ],
-      "notesInFlow": true,
-      "notes": "Agenda de la regla R1. Sondeo periódico, no detección instantánea garantizada."
+      "notes": "Sondeo periódico de la regla R1.",
+      "notesInFlow": true
     },
     {
       "parameters": {},
-      "id": "07b46cd8-9bb0-4563-91b9-748bb899c5d3",
+      "id": "prueba-manual",
       "name": "Prueba manual",
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
       "position": [
         0,
-        272
+        200
       ],
-      "notesInFlow": true,
-      "notes": "Permite ejecutar esta misma regla desde el editor durante QA."
+      "notes": "Ejecutar la regla a mano desde el editor.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT 'R1-' || s.queryid || '-' || s.calls || '-' || (SELECT extract(epoch FROM stats_reset)::bigint FROM pg_stat_statements_info) AS huella,\n       s.queryid::text AS queryid, s.calls,\n       round(s.mean_exec_time)::int AS ms_promedio, round(s.max_exec_time)::int AS ms_maximo,\n       r.rolname AS usuario, left(regexp_replace(s.query, '\\s+', ' ', 'g'), 200) AS consulta,\n       format(E'Query: %s\\nTiempo promedio: %s ms (umbral: 1000 ms) | máximo: %s ms\\nEjecuciones: %s\\nUsuario: %s',\n              left(regexp_replace(s.query, '\\s+', ' ', 'g'), 200), round(s.mean_exec_time), round(s.max_exec_time), s.calls, r.rolname) AS texto\nFROM pg_stat_statements s\nJOIN pg_roles r ON r.oid = s.userid\nWHERE s.mean_exec_time > 1000\n  AND r.rolname <> 'n8n_app'\n  AND s.query NOT ILIKE '%pg_stat_statements%'\n  -- máximo un aviso por consulta cada 10 minutos (evita ráfagas)\n  AND NOT EXISTS (SELECT 1 FROM alertas_auditoria a WHERE a.alerta = 'R1'\n                  AND a.detalles->>'queryid' = s.queryid::text AND a.fecha > now() - interval '10 minutes')\nORDER BY s.mean_exec_time DESC\nLIMIT 5;",
+        "options": {}
+      },
+      "id": "detectar",
+      "name": "Detectar R1",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        240,
+        100
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "__CRED_MONITOR__",
+          "name": "Nutri Postgres monitor_db"
+        }
+      },
+      "notes": "Fuente: pg_stat_statements (mean_exec_time > 1000 ms)",
+      "notesInFlow": true
     },
     {
       "parameters": {
         "conditions": {
           "options": {
-            "caseSensitive": {},
+            "caseSensitive": true,
             "leftValue": "",
-            "typeValidation": {},
-            "version": {}
+            "typeValidation": "loose",
+            "version": 2
           },
           "conditions": [
             {
-              "id": "R1",
-              "leftValue": "={{ $json.queryid }}",
-              "rightValue": true,
+              "id": "c1",
+              "leftValue": "={{ $json.huella }}",
+              "rightValue": "",
               "operator": {
                 "type": "string",
                 "operation": "notEmpty",
@@ -58,75 +84,55 @@
           ],
           "combinator": "and"
         },
+        "looseTypeValidation": true,
         "options": {}
       },
-      "id": "4b8fd9e7-4cd2-4b11-a0ca-4d284ff87dd7",
-      "name": "Hay hallazgo",
+      "id": "-hay-hallazgo-",
+      "name": "¿Hay hallazgo?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        528,
-        0
-      ],
-      "notesInFlow": true,
-      "notes": "Solo la rama verdadera solicita notificación. Sin hallazgo no se envía Telegram."
+        480,
+        100
+      ]
     },
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT queryid, calls, round(mean_exec_time) AS ms_promedio, left(query,200) AS consulta\nFROM pg_stat_statements\nWHERE mean_exec_time > 1000\n  AND query NOT ILIKE '%pg_stat_statements%'\nORDER BY mean_exec_time DESC\nLIMIT 5;",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.6,
-      "position": [
-        208,
-        0
-      ],
-      "id": "ee51c959-a5c7-45a6-8c12-b001bb39afb2",
-      "name": "Detectar R1",
-      "alwaysOutputData": true,
-      "credentials": {
-        "postgres": {
-          "id": "1Cx22i0z55yy8wXL",
-          "name": "Nutri Postgres monitor_db"
+        "query": "INSERT INTO alertas_auditoria (tipo, alerta, mensaje, detalles, severidad, huella)\nVALUES ('rendimiento', 'R1', 'Consulta lenta', $1::jsonb, 'advertencia', $2)\nON CONFLICT (huella) DO UPDATE SET intentos = alertas_auditoria.intentos\n  WHERE alertas_auditoria.estado = 'pendiente'\nRETURNING id::text AS id;",
+        "options": {
+          "queryReplacement": "={{ [ JSON.stringify($json), $json.huella ] }}"
         }
-      }
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "INSERT INTO alertas_auditoria (tipo, alerta, mensaje, detalles, severidad, huella)\nVALUES (\n  'rendimiento',\n  'R1',\n  'Consulta lenta detectada',\n  '{{ JSON.stringify($json) }}'::jsonb,\n  'media',\n  'R1-{{ $json.queryid }}-{{ $json.calls }}'\n)\nON CONFLICT (huella) DO NOTHING\nRETURNING id;",
-        "options": {}
       },
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.6,
-      "position": [
-        144,
-        144
-      ],
-      "id": "2fcc0d5e-5c2f-462a-b6cc-a51affd330d2",
+      "id": "registrar",
       "name": "Registrar alerta R1",
-      "alwaysOutputData": true,
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        720,
+        100
+      ],
       "credentials": {
         "postgres": {
-          "id": "1Cx22i0z55yy8wXL",
+          "id": "__CRED_MONITOR__",
           "name": "Nutri Postgres monitor_db"
         }
-      }
+      },
+      "notes": "La huella UNIQUE evita repetir un hallazgo ya enviado; si quedó pendiente (falló Telegram) se reintenta.",
+      "notesInFlow": true
     },
     {
       "parameters": {
         "conditions": {
           "options": {
-            "caseSensitive": {},
+            "caseSensitive": true,
             "leftValue": "",
-            "typeValidation": {},
-            "version": {}
+            "typeValidation": "loose",
+            "version": 2
           },
           "conditions": [
             {
-              "id": "9e66e48e-16da-4756-8bbd-67d71b8ecdf1",
+              "id": "c1",
               "leftValue": "={{ $json.id }}",
               "rightValue": "",
               "operator": {
@@ -138,41 +144,69 @@
           ],
           "combinator": "and"
         },
+        "looseTypeValidation": true,
         "options": {}
       },
+      "id": "-alerta-nueva-",
+      "name": "¿Alerta nueva?",
       "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
+      "typeVersion": 2.2,
       "position": [
-        352,
-        144
-      ],
-      "id": "5f5ad1ee-a862-4b6c-abde-103d795faca0",
-      "name": "Es alerta nueva?"
+        960,
+        100
+      ]
     },
     {
       "parameters": {
-        "chatId": "-5513672600",
-        "text": "=🚨 *ALERTA R1 — Consulta lenta detectada* • ID evento: {{ $json.id }} • Query ID: {{ $('Detectar R1').item.json.queryid }} • Promedio: {{ $('Detectar R1').item.json.ms_promedio }} ms ({{ $('Detectar R1').item.json.calls }} ejecuciones) • SQL: `{{ $('Detectar R1').item.json.consulta }}`",
-        "additionalFields": {}
+        "chatId": "__TELEGRAM_CHAT_ID__",
+        "text": "=<b>ALERTA ADVERTENCIA - NutriAnimales S.A. | Lead University BCD 9220</b>\n<b>Alerta:</b> R1 — Consulta lenta\n<b>Fecha:</b> {{ $now.setZone('America/Costa_Rica').toFormat('yyyy-MM-dd HH:mm:ss') }}\n{{ $('Detectar R1').item.json.texto.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }}\n<b>Severidad:</b> ADVERTENCIA\n<b>Acción:</b> Revisar el plan (EXPLAIN ANALYZE) e índices; si bloquea el despacho, cancelar con pg_cancel_backend(pid).\n<i>Registro: alertas_auditoria {{ $('Registrar alerta R1').item.json.id }}</i>",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
       },
+      "id": "enviar-telegram",
+      "name": "Enviar alerta R1",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
-        656,
-        144
+        1200,
+        100
       ],
-      "id": "d66a706f-5598-48d3-852b-35f0f9c5bf9b",
-      "name": "Enviar alerta R1",
-      "webhookId": "3e0a244b-f939-4cea-a8f3-682a96aac740",
+      "webhookId": "nutri-R1-telegram",
       "credentials": {
         "telegramApi": {
-          "id": "buC8KFqNgkVUsSoI",
+          "id": "__CRED_TELEGRAM__",
           "name": "Nutri Telegram bot"
         }
       }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE alertas_auditoria\nSET estado = 'enviada', enviada_en = now(), intentos = intentos + 1\nWHERE id = $1::uuid;",
+        "options": {
+          "queryReplacement": "={{ [ $('Registrar alerta R1').item.json.id ] }}"
+        }
+      },
+      "id": "marcar-enviada",
+      "name": "Marcar enviada R1",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1440,
+        100
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "__CRED_MONITOR__",
+          "name": "Nutri Postgres monitor_db"
+        }
+      },
+      "notes": "Deja constancia de la entrega en alertas_auditoria.",
+      "notesInFlow": true
     }
   ],
-  "pinData": {},
   "connections": {
     "Cada 30 segundos": {
       "main": [
@@ -196,7 +230,29 @@
         ]
       ]
     },
-    "Hay hallazgo": {
+    "Detectar R1": {
+      "main": [
+        [
+          {
+            "node": "¿Hay hallazgo?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar alerta R1": {
+      "main": [
+        [
+          {
+            "node": "Marcar enviada R1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Hay hallazgo?": {
       "main": [
         [
           {
@@ -207,29 +263,18 @@
         ]
       ]
     },
-    "Detectar R1": {
-      "main": [
-        [
-          {
-            "node": "Hay hallazgo",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Registrar alerta R1": {
       "main": [
         [
           {
-            "node": "Es alerta nueva?",
+            "node": "¿Alerta nueva?",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Es alerta nueva?": {
+    "¿Alerta nueva?": {
       "main": [
         [
           {
@@ -241,17 +286,10 @@
       ]
     }
   },
-  "active": false,
   "settings": {
     "executionOrder": "v1",
-    "binaryMode": "separate"
+    "timezone": "America/Costa_Rica"
   },
-  "versionId": "195c0e07-8421-4d6f-a963-c62444ac057f",
-  "meta": {
-    "templateCredsSetupCompleted": true,
-    "instanceId": "e59ebbaf3db5880c93bb1012846c792a2332815d03ff00026d455885dc224d06"
-  },
-  "nodeGroups": [],
-  "id": "M0LRvSkwKNgfDIFt",
+  "pinData": {},
   "tags": []
 }

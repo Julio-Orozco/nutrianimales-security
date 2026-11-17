@@ -1,6 +1,6 @@
 # NutriAnimales S.A. — Seguridad de infraestructura y base de datos
 
-Proyecto académico de Seguridad de Sistemas Digitales (BCD 9220). Los datos son ficticios. Este checkout contiene Docker Compose, PostgreSQL, Nginx, pgAdmin, Filebeat y 18 definiciones JSON de flujos n8n. El proyecto **no usa Python**: la detección y las alertas se construyen con nodos de n8n que consultan PostgreSQL. No contiene el stack Logstash/Loki ni el PDF/Word del informe; por tanto, esos componentes no se declaran desplegados ni comprobados.
+Proyecto académico de Seguridad de Sistemas Digitales (BCD 9220). Los datos son ficticios. Contiene Docker Compose, PostgreSQL, Nginx, pgAdmin, Filebeat, 18 flujos n8n (17 alertas + bot de Telegram con Groq) y un agente del host para UFW y SSH. El proyecto **no usa Python**: la detección y las alertas se construyen con nodos de n8n que consultan PostgreSQL. No incluye Loki/Logstash (Filebeat escribe a consola) ni el informe PDF/Word.
 
 ## Requisitos
 
@@ -35,7 +35,7 @@ El script agrega `N8N_DB_PASSWORD` a `.env` si falta (sin modificar las demás v
 
 ## Acceso y puertos
 
-- n8n: <https://localhost:8443>. Verificado el 14/11/2026: `healthz` responde `ok`, la ruta raíz devuelve HTTP 200 con la interfaz de n8n y el WebSocket `/rest/push` se establece a través de Nginx. La primera visita muestra el formulario para crear la cuenta propietaria de n8n; esa cuenta la crea el equipo y no se guarda en el repositorio.
+- n8n: <https://localhost:8443>. `scripts/n8n-configurar.sh` crea la cuenta propietaria con `N8N_OWNER_EMAIL`/`N8N_OWNER_PASSWORD` de `.env` si la instancia es nueva.
 - pgAdmin, a través del proxy Nginx: <https://localhost:8443/pgadmin/>
 - Redirección HTTP: `http://localhost:8080`
 - Solo Nginx publica puertos, ligados a `127.0.0.1`. PostgreSQL, n8n, pgAdmin y Filebeat no publican puertos al host. pgAdmin no publica `5050`.
@@ -83,9 +83,22 @@ docker compose exec -T postgres psql -X -U postgres -d nutrianimales < db/demo-a
 
 La matriz de cumplimiento, los comandos de comprobación y los resultados de esta instalación están en [docs/CUMPLIMIENTO.md](docs/CUMPLIMIENTO.md), [docs/COMANDOS.md](docs/COMANDOS.md) y [evidencias/RESULTADOS_AB.md](evidencias/RESULTADOS_AB.md). La guía de captura distingue siempre configuración de prueba ejecutada.
 
-## Alcance no incluido en este checkout
+## Alertas n8n, bot y demostración (integración final)
 
-Los JSON de `n8n/workflows/` no se importan automáticamente y provienen de una versión anterior que llamaba a un servicio Python (`monitor`) que este proyecto no usa; los integrantes de monitoreo y bot deben adaptarlos o rehacerlos siguiendo [docs/FLUJOS_N8N.md](docs/FLUJOS_N8N.md). Tampoco se incluye una conexión Filebeat→Logstash→Loki ni el informe original adjunto. En este WSL, `/var/log/ufw.log` no es un archivo de log sino un directorio vacío creado por Docker al montar una ruta inexistente, por lo que Filebeat no recibe eventos UFW. No se debe afirmar que alertas, Telegram, monitor, ataques, backups o pruebas de otras partes están ejecutados. Para completar esas funciones se necesitan los archivos fuente y el documento oficial que no están en este espacio de trabajo.
+Rama `integracion/demo-final`: integra el trabajo de los 5 integrantes (A-B infraestructura y BD, monitoreo R/H, datos y ataques D/B0, riesgos y RBAC en `parte-e/`). Después de `docker compose up -d --wait`:
+
+```bash
+bash scripts/aplicar-sql-alertas.sh   # soporte SQL de las alertas (idempotente)
+bash scripts/demo-preparar.sh         # estadísticas y baselines limpias
+bash scripts/n8n-configurar.sh        # credenciales desde .env + 18 flujos publicados (debe decir 18 / 18)
+sudo bash scripts/agente-host.sh      # en otra terminal: UFW (H1) y SSH (R4)
+bash scripts/pruebas-seguridad.sh     # 24 comprobaciones de seguridad
+```
+
+- Guía completa de la presentación (hardening, 17 alertas, 5 ataques, rotación de Groq): [docs/GUIA_DEMO_EN_VIVO.md](docs/GUIA_DEMO_EN_VIVO.md)
+- Diseño de los flujos: [docs/FLUJOS_N8N.md](docs/FLUJOS_N8N.md) · Secretos: [docs/SECRETOS.md](docs/SECRETOS.md)
+- Escenarios: `bash scripts/demo.sh` · Respaldo (D3): `bash scripts/backup.sh`
+- Resultados de las pruebas de integración: [evidencias/RESULTADOS_INTEGRACION.md](evidencias/RESULTADOS_INTEGRACION.md)
 
 ## Detener sin borrar datos
 

@@ -37,7 +37,7 @@ docker run -d --rm --name "$name" --network none --env-file .env \
 ready=0
 for attempt in $(seq 1 90); do
   if initialized="$(docker exec "$name" psql -X -U postgres -d nutrianimales \
-    -Atqc "SELECT current_setting('listen_addresses')='*' AND (SELECT count(*) FROM clientes)=1500 AND (SELECT count(*) FROM pg_settings_baseline)=7 AND (SELECT count(*) FROM information_schema.triggers WHERE trigger_schema='public')=20 AND (SELECT pg_get_userbyid(nspowner) FROM pg_namespace WHERE nspname='n8n')='n8n_app'" 2>/dev/null)"; then
+    -Atqc "SELECT current_setting('listen_addresses')='*' AND (SELECT count(*) FROM clientes)=1500 AND (SELECT count(*) FROM pg_settings_baseline)=7 AND (SELECT count(*) FROM information_schema.triggers WHERE trigger_schema='public')=20 AND (SELECT pg_get_userbyid(nspowner) FROM pg_namespace WHERE nspname='n8n')='n8n_app' AND (SELECT count(*) FROM archivos_baseline)=3 AND EXISTS (SELECT 1 FROM pg_event_trigger WHERE evtname='trg_evento_grant')" 2>/dev/null)"; then
     if [ "$initialized" = "t" ]; then
       ready=1
       break

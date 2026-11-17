@@ -1,1 +1,213 @@
-[{"updatedAt":"2026-11-16T11:02:49.883Z","createdAt":"2026-11-16T10:13:08.238Z","id":"nutriH1UfwAlert01","name":"Nutri H1 — Reglas UFW modificadas","description":null,"active":true,"isArchived":false,"nodes":[{"parameters":{"rule":{"interval":[{"field":"seconds"}]}},"id":"706f72d5-9567-5165-80bd-37728d69ba44","name":"Cada 30 segundos","type":"n8n-nodes-base.scheduleTrigger","typeVersion":1.2,"position":[0,0],"notesInFlow":true,"notes":"Agenda de la regla H1. Sondeo periódico cada 30 segundos."},{"parameters":{},"id":"aeae0485-6434-5f0f-a245-bfbb493c5c1f","name":"Prueba manual","type":"n8n-nodes-base.manualTrigger","typeVersion":1,"position":[0,240],"notesInFlow":true,"notes":"Permite ejecutar esta regla manualmente desde el editor durante QA."},{"parameters":{"operation":"executeQuery","query":"SELECT id, tipo, alerta, mensaje, detalles, severidad, huella, fecha\nFROM alertas_auditoria\nWHERE alerta = 'H1'\n  AND estado = 'pendiente'\nORDER BY fecha ASC\nLIMIT 1;","options":{}},"id":"ff346a79-f5d1-5e2f-8234-72b11ac5867d","name":"Detectar H1","type":"n8n-nodes-base.postgres","typeVersion":2.5,"alwaysOutputData":false,"position":[288,128],"notesInFlow":true,"credentials":{"postgres":{"id":"1Cx22i0z55yy8wXL","name":"Nutri Postgres monitor_db"}},"notes":"Consulta eventos recientes de modificación de reglas UFW registrados desde el host."},{"parameters":{"conditions":{"options":{"caseSensitive":null,"leftValue":"","typeValidation":null,"version":null},"conditions":[{"id":"H1","leftValue":"=={{ $json.id }}","rightValue":"","operator":{"type":"string","operation":"notEmpty","singleValue":true}}],"combinator":"and"},"options":{}},"id":"e96865c4-d51e-5aa4-8884-d003cf263483","name":"Hay hallazgo","type":"n8n-nodes-base.if","typeVersion":2.2,"position":[544,128],"notesInFlow":true,"notes":"Solo la rama verdadera registra y notifica. Sin hallazgo no se envía Telegram."},{"parameters":{"operation":"executeQuery","query":"UPDATE alertas_auditoria\nSET estado = 'enviada',\n    enviada_en = now(),\n    intentos = intentos + 1\nWHERE id::text = '{{ $json.id }}'\n  AND estado = 'pendiente'\nRETURNING id, huella;","options":{}},"id":"fa3a5c99-d7c0-5fd5-83b9-272d29a8484c","name":"Registrar alerta H1","type":"n8n-nodes-base.postgres","typeVersion":2.5,"position":[800,48],"notesInFlow":true,"alwaysOutputData":false,"credentials":{"postgres":{"id":"1Cx22i0z55yy8wXL","name":"Nutri Postgres monitor_db"}},"notes":"Inserta la alerta H1 sin duplicados usando la huella única del hash UFW."},{"parameters":{"chatId":"-5513672600","text":"==🛡️ *ALERTA H1 — Reglas UFW modificadas*\n• ID alerta: `{{ $json.id }}`\n• Fuente: `{{ $('Detectar H1').item.json.detalles.fuente }}`\n• Hash anterior: `{{ $('Detectar H1').item.json.detalles.hash_anterior.slice(0,12) }}...`\n• Hash nuevo: `{{ $('Detectar H1').item.json.detalles.hash_actual.slice(0,12) }}...`","additionalFields":{}},"id":"fa3a5c99-d7c0-5fd5-83b9-272d29a8484d","name":"Enviar alerta H1","type":"n8n-nodes-base.telegram","typeVersion":1.2,"position":[1280,48],"notesInFlow":true,"webhookId":"2d9f4ffb-fe60-4028-aa50-062131a787cf","credentials":{"telegramApi":{"id":"buC8KFqNgkVUsSoI","name":"Nutri Telegram bot"}},"notes":"Envía la notificación al grupo de alertas de Telegram solo si el INSERT devolvió un nuevo id."},{"parameters":{"conditions":{"options":{"caseSensitive":null,"leftValue":"","typeValidation":null,"version":null},"conditions":[{"id":"c7e52a3b-298f-43f1-ad1f-ce68ce1c5e2a","leftValue":"=={{ $json.id }}","rightValue":"","operator":{"type":"string","operation":"notEmpty","singleValue":true}}],"combinator":"and"},"options":{}},"type":"n8n-nodes-base.if","typeVersion":2.3,"position":[1008,48],"id":"544a47d1-02ea-40ad-8fab-6f55678f8317","name":"¿Se insertó ID?"}],"connections":{"Cada 30 segundos":{"main":[[{"node":"Detectar H1","type":"main","index":0}]]},"Prueba manual":{"main":[[{"node":"Detectar H1","type":"main","index":0}]]},"Detectar H1":{"main":[[{"node":"Hay hallazgo","type":"main","index":0}]]},"Hay hallazgo":{"main":[[{"node":"Registrar alerta H1","type":"main","index":0}],[]]},"Registrar alerta H1":{"main":[[{"node":"¿Se insertó ID?","type":"main","index":0}]]},"¿Se insertó ID?":{"main":[[{"node":"Enviar alerta H1","type":"main","index":0}]]}},"settings":{"executionOrder":"v1","timezone":"America/Costa_Rica","binaryMode":"separate"},"staticData":{"node:Cada 30 segundos":{"recurrenceRules":[null],"recurrenceRuleSignatures":[null]}},"meta":{"templateCredsSetupCompleted":true},"nodeGroups":[],"pinData":{},"versionId":"dcbc53b8-696a-4a24-a407-145d4f5e9f87","activeVersionId":"dcbc53b8-696a-4a24-a407-145d4f5e9f87","versionCounter":21,"triggerCount":1,"sourceWorkflowId":null,"tags":[],"shared":[{"updatedAt":"2026-11-16T10:13:08.238Z","createdAt":"2026-11-16T10:13:08.238Z","role":"workflow:owner","workflowId":"nutriH1UfwAlert01","projectId":"8l1257YqVlxclfee","project":{"updatedAt":"2026-11-15T23:50:05.011Z","createdAt":"2026-11-15T23:15:12.563Z","id":"8l1257YqVlxclfee","name":"dayan Abarca <abarcabrenes.dayan@gmail.com>","type":"personal","icon":null,"description":null,"customTelemetryTags":[],"creatorId":"09619d88-c0f7-4f00-8f05-5605af469f30"}}],"versionMetadata":{"name":"Version dcbc53b8","description":""}}]
+{
+  "id": "nutriH1alerta00",
+  "name": "Nutri H1 — Puerto abierto o regla UFW modificada",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "seconds",
+              "secondsInterval": 30
+            }
+          ]
+        }
+      },
+      "id": "cada-30-segundos",
+      "name": "Cada 30 segundos",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "notes": "Sondeo periódico de la regla H1.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {},
+      "id": "prueba-manual",
+      "name": "Prueba manual",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        200
+      ],
+      "notes": "Ejecutar la regla a mano desde el editor.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id::text AS id, huella,\n       format(E'Fuente: %s\\nReglas agregadas: %s\\nReglas eliminadas: %s\\nEstado UFW: %s\\nHash anterior: %s... | Hash nuevo: %s...\\nDetectado por el agente: %s',\n              detalles->>'fuente',\n              coalesce((SELECT string_agg(x, ' | ') FROM jsonb_array_elements_text(detalles->'agregadas') x), 'ninguna'),\n              coalesce((SELECT string_agg(x, ' | ') FROM jsonb_array_elements_text(detalles->'eliminadas') x), 'ninguna'),\n              detalles->>'estado', left(detalles->>'hash_anterior', 12), left(detalles->>'hash_actual', 12),\n              to_char(fecha, 'YYYY-MM-DD HH24:MI:SS')) AS texto\nFROM alertas_auditoria\nWHERE alerta = 'H1' AND estado = 'pendiente'\nORDER BY fecha\nLIMIT 5;",
+        "options": {}
+      },
+      "id": "detectar",
+      "name": "Detectar H1",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        240,
+        100
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "__CRED_MONITOR__",
+          "name": "Nutri Postgres monitor_db"
+        }
+      },
+      "notes": "Fuente: Agente del host (hash de UFW) -> alertas_auditoria pendientes",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.huella }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "-hay-hallazgo-",
+      "name": "¿Hay hallazgo?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        480,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "__TELEGRAM_CHAT_ID__",
+        "text": "=<b>ALERTA CRÍTICA - NutriAnimales S.A. | Lead University BCD 9220</b>\n<b>Alerta:</b> H1 — Puerto abierto o regla UFW modificada\n<b>Fecha:</b> {{ $now.setZone('America/Costa_Rica').toFormat('yyyy-MM-dd HH:mm:ss') }}\n{{ $('Detectar H1').item.json.texto.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }}\n<b>Severidad:</b> CRÍTICA\n<b>Acción:</b> Confirmar si el cambio fue autorizado; si no, revertir con sudo ufw delete &lt;regla&gt;.\n<i>Registro: alertas_auditoria {{ $('Detectar H1').item.json.id }}</i>",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "enviar-telegram",
+      "name": "Enviar alerta H1",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        720,
+        100
+      ],
+      "webhookId": "nutri-H1-telegram",
+      "credentials": {
+        "telegramApi": {
+          "id": "__CRED_TELEGRAM__",
+          "name": "Nutri Telegram bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE alertas_auditoria\nSET estado = 'enviada', enviada_en = now(), intentos = intentos + 1\nWHERE id = $1::uuid;",
+        "options": {
+          "queryReplacement": "={{ [ $('Detectar H1').item.json.id ] }}"
+        }
+      },
+      "id": "marcar-enviada",
+      "name": "Marcar enviada H1",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        960,
+        100
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "__CRED_MONITOR__",
+          "name": "Nutri Postgres monitor_db"
+        }
+      },
+      "notes": "Deja constancia de la entrega en alertas_auditoria.",
+      "notesInFlow": true
+    }
+  ],
+  "connections": {
+    "Cada 30 segundos": {
+      "main": [
+        [
+          {
+            "node": "Detectar H1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prueba manual": {
+      "main": [
+        [
+          {
+            "node": "Detectar H1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detectar H1": {
+      "main": [
+        [
+          {
+            "node": "¿Hay hallazgo?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar alerta H1": {
+      "main": [
+        [
+          {
+            "node": "Marcar enviada H1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Hay hallazgo?": {
+      "main": [
+        [
+          {
+            "node": "Enviar alerta H1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Costa_Rica"
+  },
+  "pinData": {},
+  "tags": []
+}

@@ -6,6 +6,7 @@ db/data/
 evidencias/*
 !evidencias/README.md
 !evidencias/RESULTADOS_AB.md
+!evidencias/RESULTADOS_INTEGRACION.md
 infra/certs/server.key
 infra/postgres-tls/
 infra/postgres-logs/

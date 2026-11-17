@@ -1,14 +1,28 @@
+# Filebeat recoge los logs del host relevantes para H1 (UFW) y R4/A1 (SSH).
+# La detección y la alerta las hace el agente del host + n8n; Filebeat deja la
+# evidencia centralizada (salida a consola: docker compose logs filebeat).
 filebeat.inputs:
   - type: filestream
     id: ufw-logs
     enabled: true
-    paths: 
-      - /var/log/ufw.log
-    fields: 
+    paths:
+      - /var/log/host/ufw.log
+    fields:
       proyecto: nutrianimales
+      fuente: ufw
+    fields_under_root: true
+  - type: filestream
+    id: ssh-auth
+    enabled: true
+    paths:
+      - /var/log/host/auth.log
+    include_lines: ['sshd.*(Failed password|Invalid user|Accepted)', 'ufw']
+    fields:
+      proyecto: nutrianimales
+      fuente: auth
     fields_under_root: true
 
 output.console:
-  pretty: true
+  pretty: false
 logging.level: warning
 setup.ilm.enabled: false
