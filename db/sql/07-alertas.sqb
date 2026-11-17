@@ -1,0 +1,138 @@
+-- Soporte de las 17 alertas n8n (integración final).
+-- Idempotente: se ejecuta en la inicialización limpia (00-init.sh) y también
+-- sobre una base existente con scripts/aplicar-sql-alertas.sh.
+
+-- ---------------------------------------------------------------------------
+-- Parámetros de umbral editables sin modificar los flujos (R3: horario laboral).
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS parametros_alerta (
+  clave text PRIMARY KEY,
+  valor text NOT NULL,
+  descripcion text NOT NULL
+);
+INSERT INTO parametros_alerta VALUES
+ ('r3_hora_inicio','23','Inicio del horario no laboral (hora Costa Rica, 0-23)'),
+ ('r3_hora_fin','6','Fin del horario no laboral (hora Costa Rica, 0-23, exclusiva)')
+ON CONFLICT (clave) DO NOTHING;
+
+-- ---------------------------------------------------------------------------
+-- security_snapshot(): se agrega la fecha de modificación de cada archivo para
+-- que H2 vuelva a alertar si el archivo se modifica de nuevo.
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION security_snapshot() RETURNS jsonb
+LANGUAGE sql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+ SELECT jsonb_build_object(
+ 'hashes', jsonb_build_object(
+   'postgresql.conf',encode(sha256(pg_read_binary_file(current_setting('config_file'))),'hex'),
+   'pg_hba.conf',encode(sha256(pg_read_binary_file(current_setting('hba_file'))),'hex'),
+   'postgresql.auto.conf',encode(sha256(pg_read_binary_file('postgresql.auto.conf',0,100000,true)),'hex')),
+ 'modificado', jsonb_build_object(
+   'postgresql.conf',(pg_stat_file(current_setting('config_file'))).modification,
+   'pg_hba.conf',(pg_stat_file(current_setting('hba_file'))).modification,
+   'postgresql.auto.conf',(pg_stat_file('postgresql.auto.conf',true)).modification),
+ 'hba_md5',EXISTS(SELECT 1 FROM pg_hba_file_rules WHERE auth_method='md5'),
+ 'privilegios_agente',jsonb_build_object(
+   'superuser',(SELECT rolsuper FROM pg_roles WHERE rolname='agente_ia'),
+   'createrole',(SELECT rolcreaterole FROM pg_roles WHERE rolname='agente_ia'),
+   'createdb',(SELECT rolcreatedb FROM pg_roles WHERE rolname='agente_ia'),
+   'create_schema',has_schema_privilege('agente_ia','public','CREATE'),
+   'miembro_de',(SELECT coalesce(jsonb_agg(g.rolname),'[]'::jsonb) FROM pg_auth_members m
+      JOIN pg_roles g ON g.oid=m.roleid JOIN pg_roles u ON u.oid=m.member WHERE u.rolname='agente_ia'),
+   'escritura',(SELECT coalesce(jsonb_agg(c.relname),'[]'::jsonb) FROM pg_class c
+      JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind='r'
+      AND has_table_privilege('agente_ia',c.oid,'INSERT,UPDATE,DELETE,TRUNCATE,TRIGGER,REFERENCES'))))
+$$;
+REVOKE ALL ON FUNCTION security_snapshot() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION security_snapshot() TO monitor_db;
+
+-- ---------------------------------------------------------------------------
+-- H2: baseline de hashes de los archivos de configuración (antes estaba
+-- escrito a mano dentro del flujo y no coincidía entre computadoras).
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS archivos_baseline (
+  archivo text PRIMARY KEY,
+  hash_esperado text NOT NULL,
+  registrado timestamptz NOT NULL DEFAULT now()
+);
+CREATE OR REPLACE FUNCTION fn_registrar_baseline_archivos() RETURNS void
+LANGUAGE sql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+  INSERT INTO public.archivos_baseline(archivo, hash_esperado)
+  SELECT key, value FROM jsonb_each_text(public.security_snapshot()->'hashes')
+  ON CONFLICT (archivo) DO UPDATE SET hash_esperado = EXCLUDED.hash_esperado, registrado = now();
+$$;
+REVOKE ALL ON FUNCTION fn_registrar_baseline_archivos() FROM PUBLIC;
+DO $$ BEGIN PERFORM fn_registrar_baseline_archivos(); END $$;
+
+-- ---------------------------------------------------------------------------
+-- R4 / H4: eventos de autenticación leídos del log JSON de PostgreSQL.
+-- Los logs son 0600 del usuario postgres; esta función SECURITY DEFINER solo
+-- devuelve los campos necesarios de las líneas de rechazo, nunca el archivo.
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION eventos_log_pg(ventana interval DEFAULT interval '10 minutes')
+RETURNS TABLE(fecha timestamptz, tipo text, usuario text, ip text, mensaje text)
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+DECLARE
+  f record; contenido text; inicio bigint;
+  max_bytes constant bigint := 2000000;
+BEGIN
+  FOR f IN
+    SELECT name, size FROM pg_ls_logdir()
+    WHERE name LIKE '%.json' AND modification > now() - ventana - interval '1 minute'
+    ORDER BY modification DESC LIMIT 2
+  LOOP
+    inicio := greatest(f.size - max_bytes, 0);
+    contenido := pg_read_file(current_setting('log_directory') || '/' || f.name, inicio, max_bytes, true);
+    CONTINUE WHEN contenido IS NULL;
+    RETURN QUERY
+      SELECT (j->>'timestamp')::timestamptz,
+             CASE WHEN j->>'message' ILIKE '%authentication failed%' THEN 'auth_fallida'
+                  ELSE 'hba_rechazo' END,
+             coalesce(j->>'user', substring(j->>'message' from 'user "([^"]*)"')),
+             coalesce(j->>'remote_host', substring(j->>'message' from 'host "([^"]*)"')),
+             left(j->>'message', 200)
+      FROM (
+        SELECT l::jsonb AS j
+        FROM regexp_split_to_table(contenido, E'\n') AS l
+        WHERE l LIKE '{%}'
+          AND (l ILIKE '%authentication failed%' OR l ILIKE '%pg_hba.conf rejects%'
+               OR l ILIKE '%no pg_hba.conf entry%')
+      ) s
+      WHERE (j->>'timestamp')::timestamptz > now() - ventana;
+  END LOOP;
+END $$;
+REVOKE ALL ON FUNCTION eventos_log_pg(interval) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION eventos_log_pg(interval) TO monitor_db, rol_auditor;
+
+-- ---------------------------------------------------------------------------
+-- H3: event trigger que registra cada GRANT/REVOKE en el momento en que ocurre.
+-- (security_snapshot sigue detectando el estado aunque el evento se pierda).
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION fn_evento_grant() RETURNS event_trigger
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+DECLARE detalle jsonb;
+BEGIN
+  detalle := jsonb_build_object(
+    'comando', tg_tag, 'usuario', session_user,
+    'ip', coalesce(inet_client_addr()::text,'local'),
+    'sentencia', left(current_query(), 500));
+  INSERT INTO public.eventos_seguridad(fuente, tipo, detalle, huella)
+  VALUES ('postgresql', tg_tag, detalle, 'ddl-' || txid_current() || '-' || clock_timestamp());
+  INSERT INTO public.auditoria_datos(tabla, operacion, usuario, ip_cliente, valor_nuevo, transaccion)
+  VALUES ('evento:postgresql', tg_tag, session_user, inet_client_addr(), detalle, txid_current());
+END $$;
+ALTER FUNCTION fn_evento_grant() OWNER TO audit_owner;
+REVOKE ALL ON FUNCTION fn_evento_grant() FROM PUBLIC;
+DROP EVENT TRIGGER IF EXISTS trg_evento_grant;
+CREATE EVENT TRIGGER trg_evento_grant ON ddl_command_end
+  WHEN TAG IN ('GRANT', 'REVOKE')
+  EXECUTE FUNCTION fn_evento_grant();
+
+-- ---------------------------------------------------------------------------
+-- Permisos de lectura para las nuevas tablas.
+-- ---------------------------------------------------------------------------
+GRANT SELECT ON parametros_alerta, archivos_baseline TO monitor_db, rol_ti, rol_auditor;
+GRANT SELECT ON eventos_seguridad TO monitor_db;
+
+-- Corrección: registrar_evento() usa RETURNING id y necesita SELECT sobre
+-- eventos_seguridad; sin él fallaba con "permission denied".
+GRANT SELECT ON eventos_seguridad TO audit_owner;

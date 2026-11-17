@@ -1,11 +1,9 @@
 {
-  "name": "Nutri H1 — Reglas UFW modificadas",
+  "id": "nutriH1alerta00",
+  "name": "Nutri H1 — Puerto abierto o regla UFW modificada",
+  "active": true,
   "nodes": [
     {
-      "id": "706f72d5-9567-5165-80bd-37728d69ba44",
-      "name": "Cada 30 segundos",
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.2,
       "parameters": {
         "rule": {
           "interval": [
@@ -16,120 +14,137 @@
           ]
         }
       },
+      "id": "cada-30-segundos",
+      "name": "Cada 30 segundos",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
       "position": [
         0,
         0
       ],
-      "notes": "Agenda de la regla H1. Sondeo periódico, no detección instantánea garantizada.",
+      "notes": "Sondeo periódico de la regla H1.",
       "notesInFlow": true
     },
     {
-      "id": "aeae0485-6434-5f0f-a245-bfbb493c5c1f",
+      "parameters": {},
+      "id": "prueba-manual",
       "name": "Prueba manual",
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
-      "parameters": {},
       "position": [
         0,
-        240
+        200
       ],
-      "notes": "Permite ejecutar esta misma regla desde el editor durante QA.",
+      "notes": "Ejecutar la regla a mano desde el editor.",
       "notesInFlow": true
     },
     {
-      "id": "ff346a79-f5d1-5e2f-8234-72b11ac5867d",
-      "name": "Detectar H1",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
       "parameters": {
-        "method": "POST",
-        "url": "http://monitor:8000/checks/H1",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "options": {
-          "timeout": 120000
-        }
+        "operation": "executeQuery",
+        "query": "SELECT id::text AS id, huella,\n       format(E'Fuente: %s\\nReglas agregadas: %s\\nReglas eliminadas: %s\\nEstado UFW: %s\\nHash anterior: %s... | Hash nuevo: %s...\\nDetectado por el agente: %s',\n              detalles->>'fuente',\n              coalesce((SELECT string_agg(x, ' | ') FROM jsonb_array_elements_text(detalles->'agregadas') x), 'ninguna'),\n              coalesce((SELECT string_agg(x, ' | ') FROM jsonb_array_elements_text(detalles->'eliminadas') x), 'ninguna'),\n              detalles->>'estado', left(detalles->>'hash_anterior', 12), left(detalles->>'hash_actual', 12),\n              to_char(fecha, 'YYYY-MM-DD HH24:MI:SS')) AS texto\nFROM alertas_auditoria\nWHERE alerta = 'H1' AND estado = 'pendiente'\nORDER BY fecha\nLIMIT 5;",
+        "options": {}
       },
+      "id": "detectar",
+      "name": "Detectar H1",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
       "position": [
-        260,
-        0
+        240,
+        100
       ],
-      "notes": "Reglas UFW modificadas. Fuente: Agente Ubuntu + reglas UFW. Condición: Hash distinto al baseline del host. Devuelve evidencia real o un error de fuente no disponible.",
-      "notesInFlow": true,
       "credentials": {
-        "httpHeaderAuth": {
-          "id": "REEMPLAZAR_AL_IMPORTAR",
-          "name": "Nutri monitor"
+        "postgres": {
+          "id": "__CRED_MONITOR__",
+          "name": "Nutri Postgres monitor_db"
         }
       },
-      "retryOnFail": true,
-      "maxTries": 3,
-      "waitBetweenTries": 2000
+      "notes": "Fuente: Agente del host (hash de UFW) -> alertas_auditoria pendientes",
+      "notesInFlow": true
     },
     {
-      "id": "e96865c4-d51e-5aa4-8884-d003cf263483",
-      "name": "Hay hallazgo",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.2,
       "parameters": {
         "conditions": {
           "options": {
             "caseSensitive": true,
             "leftValue": "",
-            "typeValidation": "strict",
+            "typeValidation": "loose",
             "version": 2
           },
           "conditions": [
             {
-              "id": "H1",
-              "leftValue": "={{ $json.detected }}",
-              "rightValue": true,
+              "id": "c1",
+              "leftValue": "={{ $json.huella }}",
+              "rightValue": "",
               "operator": {
-                "type": "boolean",
-                "operation": "true",
+                "type": "string",
+                "operation": "notEmpty",
                 "singleValue": true
               }
             }
           ],
           "combinator": "and"
-        }
+        },
+        "looseTypeValidation": true,
+        "options": {}
       },
+      "id": "-hay-hallazgo-",
+      "name": "¿Hay hallazgo?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
       "position": [
-        520,
-        0
-      ],
-      "notes": "Solo la rama verdadera solicita notificación. Sin hallazgo no se envía Telegram.",
-      "notesInFlow": true
+        480,
+        100
+      ]
     },
     {
-      "id": "fa3a5c99-d7c0-5fd5-83b9-272d29a8484c",
-      "name": "Notificar H1",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
       "parameters": {
-        "method": "POST",
-        "url": "=http://monitor:8000/notify/{{ $json.event_id }}",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "options": {
-          "timeout": 120000
+        "chatId": "__TELEGRAM_CHAT_ID__",
+        "text": "=<b>ALERTA CRÍTICA - NutriAnimales S.A. | Lead University BCD 9220</b>\n<b>Alerta:</b> H1 — Puerto abierto o regla UFW modificada\n<b>Fecha:</b> {{ $now.setZone('America/Costa_Rica').toFormat('yyyy-MM-dd HH:mm:ss') }}\n{{ $('Detectar H1').item.json.texto.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }}\n<b>Severidad:</b> CRÍTICA\n<b>Acción:</b> Confirmar si el cambio fue autorizado; si no, revertir con sudo ufw delete &lt;regla&gt;.\n<i>Registro: alertas_auditoria {{ $('Detectar H1').item.json.id }}</i>",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
         }
       },
+      "id": "enviar-telegram",
+      "name": "Enviar alerta H1",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
       "position": [
-        800,
-        0
+        720,
+        100
       ],
-      "notes": "Invoca una operación fija del monitor. La credencial se importa cifrada en n8n, nunca en este JSON. Reintenta fallos transitorios; la bandeja evita duplicados normales.",
-      "notesInFlow": true,
+      "webhookId": "nutri-H1-telegram",
       "credentials": {
-        "httpHeaderAuth": {
-          "id": "REEMPLAZAR_AL_IMPORTAR",
-          "name": "Nutri monitor"
+        "telegramApi": {
+          "id": "__CRED_TELEGRAM__",
+          "name": "Nutri Telegram bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE alertas_auditoria\nSET estado = 'enviada', enviada_en = now(), intentos = intentos + 1\nWHERE id = $1::uuid;",
+        "options": {
+          "queryReplacement": "={{ [ $('Detectar H1').item.json.id ] }}"
         }
       },
-      "retryOnFail": true,
-      "maxTries": 3,
-      "waitBetweenTries": 2000
+      "id": "marcar-enviada",
+      "name": "Marcar enviada H1",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        960,
+        100
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "__CRED_MONITOR__",
+          "name": "Nutri Postgres monitor_db"
+        }
+      },
+      "notes": "Deja constancia de la entrega en alertas_auditoria.",
+      "notesInFlow": true
     }
   ],
   "connections": {
@@ -159,28 +174,40 @@
       "main": [
         [
           {
-            "node": "Hay hallazgo",
+            "node": "¿Hay hallazgo?",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Hay hallazgo": {
+    "Enviar alerta H1": {
       "main": [
         [
           {
-            "node": "Notificar H1",
+            "node": "Marcar enviada H1",
             "type": "main",
             "index": 0
           }
-        ],
-        []
+        ]
+      ]
+    },
+    "¿Hay hallazgo?": {
+      "main": [
+        [
+          {
+            "node": "Enviar alerta H1",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     }
   },
   "settings": {
     "executionOrder": "v1",
     "timezone": "America/Costa_Rica"
-  }
+  },
+  "pinData": {},
+  "tags": []
 }

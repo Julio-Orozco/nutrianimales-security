@@ -1,0 +1,2366 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Parte E — Grupo 3 — Resultados</title><style>*{box-sizing:border-box}body{margin:0;color:#1d2939;background:#f5f7fa;font:16px/1.6 Segoe UI,Arial,sans-serif}header,main{max-width:1120px;margin:auto;padding:28px}header{background:#173c50;color:#fff;border-radius:0 0 16px 16px}header h1{margin:0;font-size:30px}header p{margin:10px 0 0}nav{display:flex;gap:10px;flex-wrap:wrap;margin:20px 0 28px}nav a{background:#fff;border:1px solid #cbd5e1;border-radius:6px;padding:8px 12px;text-decoration:none}a{color:#075985}article{background:#fff;padding:28px;border:1px solid #d8e0e8;border-radius:10px;margin-bottom:28px;scroll-margin-top:18px;overflow-wrap:anywhere}h1{font-size:27px}h2{font-size:21px;border-bottom:1px solid #dde5ec;padding-bottom:7px}h3{font-size:18px}table{display:block;overflow-x:auto;border-collapse:collapse;width:100%;font-size:14px;margin:16px 0}th,td{padding:10px 12px;vertical-align:top;border:1px solid #cbd5e1;min-width:110px}th{background:#e8f0f5}code{background:#edf2f6;padding:2px 5px;border-radius:3px}pre{background:#14202c;color:#edf4fa;padding:18px;overflow-x:auto;border-radius:7px;line-height:1.5}pre code{background:none;padding:0}blockquote{border-left:4px solid #0f7690;margin-left:0;padding-left:18px;color:#345}p{margin:12px 0}li{margin:6px 0}@media print{body{background:#fff}header{color:#000;background:none}nav{display:none}article{border:0;padding:0;break-before:page}table{display:table;font-size:10px}th,td{min-width:0;padding:5px}pre{white-space:pre-wrap;color:#111;background:#f2f2f2}}</style></head><body><header><h1>Parte E · NutriAnimales S.A.</h1><p>Grupo 3 · Riesgos, RBAC, secretos e informe · 16 de noviembre de 2026</p><p>E01–E04 comprobadas en la PC de E con PostgreSQL 16.14. Se incluyen seis capturas y el registro original de consola. Publicación y entrega conjunta se revisan por separado.</p></header><main><nav><a href="#seccion-0">Parte E — Riesgos, RBAC, secretos e informe</a><a href="#seccion-1">Registro de evidencias reales de E</a><a href="#seccion-2">Aporte de E al informe final</a><a href="#seccion-3">Cierre de la parte E</a><a href="#seccion-4">Explicación de comandos y código de E</a><a href="#seccion-5">Coordinación y guion personal</a><a href="#seccion-6">Revisión de la base usada por E</a><a href="#seccion-7">Inventario y gestión de secretos</a><a href="#seccion-8">Tres roles SQL y mínimo privilegio</a><a href="#seccion-9">Matriz de cinco riesgos — NutriAnimales S.A.</a><a href="#seccion-10">Validación y límites</a><a href="#seccion-11">Soporte para comprobar la parte E desde Windows</a></nav><article id="seccion-0"><h1>Parte E — Riesgos, RBAC, secretos e informe</h1>
+
+<p><strong>Grupo 3 · NutriAnimales S.A. · 16 de noviembre de 2026.</strong></p>
+
+<p>Se trabaja en <code>feature/integrante5-riesgos-rbac</code>, creada desde
+<code>feature/integrantes-A_B</code> en el commit <code>8ea8c12500aa7375ea11f57c406d7b11211c4190</code>.
+Se utiliza el nombre de empresa y base que ya tiene el repositorio.</p>
+
+<h2>Lo comprobado hasta ahora</h2>
+
+<p>Las capturas reales del integrante E están en <a href="#seccion-1">evidencias</a>:</p>
+
+<ul>
+<li><code>.env</code> está ignorado por Git.</li>
+<li>La instancia <code>nutrianimales-e</code> arrancó; PostgreSQL está <code>Healthy</code>.</li>
+<li>El motor reportó PostgreSQL <strong>16.14</strong>, base <code>nutrianimales</code>.</li>
+<li>Existen tres grupos NOLOGIN y tres cuentas LOGIN sin superusuario.</li>
+<li>La matriz consultada coincide con las lecturas y escrituras previstas.</li>
+<li>E03 ejecutó lecturas permitidas, el INSERT de ensayo de TI y cuatro rechazos
+por privilegios; terminó con <code>ROLLBACK</code>.</li>
+<li>E04 autenticó las tres cuentas por TCP con TLS 1.3 y <code>verify-full</code>; una clave
+incorrecta recibió rechazo de autenticación.</li>
+<li>El diagnóstico completo confirmó las membresías, once objetos consultados,
+cuatro triggers habilitados, TLS activo, SCRAM y reglas HBA sin errores.</li>
+</ul>
+
+<p>El registro aportado está en <a href="parte-e/evidencias/Evidencias_Parte_E.txt">Evidencias<em>Parte</em>E.txt</a>.
+Los SHA-256 de los tres archivos ejecutados coinciden con el código de este paquete.
+Las pruebas locales no certifican la instalación de Julio ni las alertas n8n de C/D.</p>
+
+<h2>Cómo reproducir las pruebas desde PowerShell</h2>
+
+<p>Las pruebas ya constan en las evidencias; estos comandos quedan para reproducirlas
+cuando sea necesario, desde la raíz del clon.</p>
+
+<p>La base ya debe estar iniciada con los dos Compose y el proyecto <code>nutrianimales-e</code>.</p>
+
+<div class="codehilite">
+<pre><span></span><code><span class="n">powershell</span> <span class="n">-NoProfile</span> <span class="n">-ExecutionPolicy</span> <span class="n">Bypass</span> <span class="o">-File</span> <span class="p">.\</span><span class="n">parte-e</span><span class="p">\</span><span class="n">Ejecutar-E</span><span class="p">.</span><span class="n">ps1</span> <span class="n">-Paso</span> <span class="n">Pruebas</span>
+</code></pre>
+</div>
+
+<p>Este paso intenta operaciones permitidas y prohibidas bajo los roles reales del
+motor. Todo el ensayo SQL va dentro de una transacción que termina con <code>ROLLBACK</code>.
+La fila temporal en <code>backups</code> no es un respaldo real. Su secuencia puede avanzar.</p>
+
+<p>Después:</p>
+
+<div class="codehilite">
+<pre><span></span><code><span class="n">powershell</span> <span class="n">-NoProfile</span> <span class="n">-ExecutionPolicy</span> <span class="n">Bypass</span> <span class="o">-File</span> <span class="p">.\</span><span class="n">parte-e</span><span class="p">\</span><span class="n">Ejecutar-E</span><span class="p">.</span><span class="n">ps1</span> <span class="n">-Paso</span> <span class="n">Autenticacion</span>
+</code></pre>
+</div>
+
+<p>Este paso abre tres conexiones TCP con contraseña y TLS <code>verify-full</code>, e intenta
+una clave deliberadamente incorrecta. Toma las claves del entorno del contenedor
+y nunca las imprime. No necesita conocerlas, enviarlas por chat ni abrir 5432.</p>
+
+<p>Para reunir todo el registro en un archivo:</p>
+
+<div class="codehilite">
+<pre><span></span><code><span class="n">powershell</span> <span class="n">-NoProfile</span> <span class="n">-ExecutionPolicy</span> <span class="n">Bypass</span> <span class="o">-File</span> <span class="p">.\</span><span class="n">parte-e</span><span class="p">\</span><span class="n">Ejecutar-E</span><span class="p">.</span><span class="n">ps1</span> <span class="n">-Paso</span> <span class="n">Todos</span>
+</code></pre>
+</div>
+
+<p><code>Todos</code> repite diagnóstico, permisos, operaciones y autenticación. Cada ejecución
+guarda su salida real en <code>parte-e/evidencias/FECHA-Paso.txt</code> e identifica por SHA-256
+el código transferido al contenedor. Si falla un comando, el proceso se detiene.</p>
+
+<p><code>-NoProfile</code> evita personalizaciones de la consola. <code>-ExecutionPolicy Bypass</code>
+permite ejecutar este archivo local en ese nuevo proceso de PowerShell;
+no modifica la política permanente ni otorga permisos administrativos.
+<code>-File</code> indica el script y <code>-Paso</code> selecciona la comprobación.
+La explicación de cada bloque está en <a href="#seccion-4">COMANDOS<em>Y</em>CODIGO.md</a>.</p>
+
+<h2>Entregables para la rama</h2>
+
+<table>
+<thead>
+<tr>
+  <th>Archivo</th>
+  <th>Para qué sirve</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><a href="#seccion-9">MATRIZ<em>RIESGOS</em>E.md</a></td>
+  <td>Cinco amenazas con P×I, responsables, controles y riesgo residual estimado.</td>
+</tr>
+<tr>
+  <td><a href="#seccion-8">MATRIZ_RBAC.md</a></td>
+  <td>Tres roles, cuentas, permisos y alcance de las pruebas.</td>
+</tr>
+<tr>
+  <td><a href="#seccion-7">INVENTARIO<em>SECRETOS</em>E.md</a></td>
+  <td>Nombres, consumidores, custodia y tratamiento de exposición; sin valores.</td>
+</tr>
+<tr>
+  <td><a href="#seccion-2">APORTE<em>INFORME</em>E.md</a></td>
+  <td>Texto de E para integrar al informe del grupo.</td>
+</tr>
+<tr>
+  <td><a href="#seccion-5">COORDINACION<em>Y</em>GUION.md</a></td>
+  <td>Evidencias que aporta cada compañero, reparto de tiempo y guion personal.</td>
+</tr>
+<tr>
+  <td><a href="#seccion-3">CHECKLIST<em>CIERRE</em>E.md</a></td>
+  <td>Criterios para cerrar E y publicar la rama.</td>
+</tr>
+<tr>
+  <td><a href="#seccion-6">HALLAZGOS_REPO.md</a></td>
+  <td>Base realmente revisada, correcciones de A/B y limitaciones actuales.</td>
+</tr>
+<tr>
+  <td><a href="#seccion-10">VALIDACION<em>DEL</em>PAQUETE.md</a></td>
+  <td>Verificación de preparación y límites de lo probado fuera de la PC de E.</td>
+</tr>
+</tbody>
+</table>
+
+<p>Los archivos se agregan al repositorio del grupo. No se reescriben sus SQL, flujos,
+Compose original ni el <code>.env</code>. El complemento Windows ya usado se incluye igual
+para que este aporte sea reproducible.</p>
+</article><article id="seccion-1"><h1>Registro de evidencias reales de E</h1>
+
+<p>Fecha: 16 de noviembre de 2026. Entorno: PC Windows del integrante E,
+Docker Desktop con contenedores Linux. Proyecto Compose <code>nutrianimales-e</code>.
+Base de código: <code>8ea8c12500aa7375ea11f57c406d7b11211c4190</code>, rama A/B;
+trabajo propio en <code>feature/integrante5-riesgos-rbac</code>.</p>
+
+<p>El usuario aportó <a href="parte-e/evidencias/Evidencias_Parte_E.txt">Evidencias<em>Parte</em>E.txt</a>, que conserva el
+registro de consola desde el clon hasta el diagnóstico final. Se incluye tal como
+se recibió, junto con seis capturas. No se reconstruyeron archivos nativos de logs
+a partir de capturas. Los archivos individuales generados por el ejecutor siguen
+en la carpeta de evidencias del clon local.</p>
+
+<h2>Resultados observados en capturas</h2>
+
+<table>
+<thead>
+<tr>
+  <th>Evidencia</th>
+  <th>Acción</th>
+  <th>Resultado observado</th>
+  <th>Qué demuestra</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><a href="parte-e/evidencias/E00_env_ignorado.png">E00<em>env</em>ignorado.png</a></td>
+  <td><code>git check-ignore -v -- .env</code></td>
+  <td><code>.gitignore:1:.env .env</code></td>
+  <td>El archivo local está excluido del seguimiento ordinario de Git. No prueba permisos NTFS ni revocación de secretos anteriores.</td>
+</tr>
+<tr>
+  <td><a href="parte-e/evidencias/E00_arranque_postgresql.png">E00<em>arranque</em>postgresql.png</a></td>
+  <td><code>up -d --wait ... postgres</code> con ambos Compose</td>
+  <td>Preparación terminó; <code>nutrianimales_e_db</code> quedó <code>Healthy</code>.</td>
+  <td>Arranque real del PostgreSQL local de E. No acredita los demás servicios.</td>
+</tr>
+<tr>
+  <td><a href="parte-e/evidencias/E01_roles_y_version.png">E01<em>roles</em>y_version.png</a></td>
+  <td>Consulta de base, versión y <code>pg_roles</code></td>
+  <td><code>nutrianimales</code>; <code>16.14 (Debian 16.14-1.pgdg13+1)</code>; seis filas de roles/cuentas.</td>
+  <td>Los tres grupos NOLOGIN y sus tres cuentas LOGIN existen, todos con <code>superusuario = f</code>.</td>
+</tr>
+<tr>
+  <td><a href="parte-e/evidencias/E02_matriz_permisos.png">E02<em>matriz</em>permisos.png</a></td>
+  <td>Cuatro comprobaciones <code>has_table_privilege</code> por cuenta</td>
+  <td>Matriz de tres filas igual a la tabla siguiente.</td>
+  <td>Privilegios efectivos en objetos específicos. No prueba por sí sola un login ni una operación ejecutada bajo ese rol.</td>
+</tr>
+<tr>
+  <td><a href="parte-e/evidencias/E03_pruebas_rbac.png">E03<em>pruebas</em>rbac.png</a></td>
+  <td><code>Ejecutar-E.ps1 -Paso Pruebas</code></td>
+  <td>Cuatro denegaciones esperadas, lecturas permitidas, INSERT de ensayo de TI y ROLLBACK final; sin error de ejecución.</td>
+  <td>PostgreSQL aplicó las restricciones durante operaciones reales bajo los roles probados.</td>
+</tr>
+<tr>
+  <td><a href="parte-e/evidencias/E04_autenticacion_tls.png">E04<em>autenticacion</em>tls.png</a></td>
+  <td><code>Ejecutar-E.ps1 -Paso Autenticacion</code></td>
+  <td>Tres logins identificados con TLS 1.3 y <code>verify-full</code>; contraseña incorrecta rechazada.</td>
+  <td>Autenticación de esas cuentas y canal TLS en conexiones TCP nuevas dentro de Docker.</td>
+</tr>
+</tbody>
+</table>
+
+<table>
+<thead>
+<tr>
+  <th>Cuenta</th>
+  <th>SELECT reporte_ventas</th>
+  <th>SELECT auditoria_datos</th>
+  <th>INSERT backups</th>
+  <th>DELETE auditoria_datos</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>gerente_db</td>
+  <td>t</td>
+  <td>f</td>
+  <td>f</td>
+  <td>f</td>
+</tr>
+<tr>
+  <td>ti_db</td>
+  <td>t</td>
+  <td>t</td>
+  <td>t</td>
+  <td>f</td>
+</tr>
+<tr>
+  <td>auditor_db</td>
+  <td>f</td>
+  <td>t</td>
+  <td>f</td>
+  <td>f</td>
+</tr>
+</tbody>
+</table>
+
+<h2>Operaciones y autenticación comprobadas</h2>
+
+<table>
+<thead>
+<tr>
+  <th>Paso</th>
+  <th>Resultado observado</th>
+  <th>Estado</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>E03 — gerente</td>
+  <td>Cuenta 4 grupos del reporte; lectura de auditoría rechazada con <code>insufficient_privilege</code>.</td>
+  <td>Correcto.</td>
+</tr>
+<tr>
+  <td>E03 — TI</td>
+  <td>Lee auditoría vacía; INSERT de ensayo devuelve id 1 y estado <code>prueba_rbac_no_respaldo</code>; DELETE de auditoría rechazado.</td>
+  <td>Correcto. La fila se revierte al finalizar.</td>
+</tr>
+<tr>
+  <td>E03 — auditor</td>
+  <td>Lee auditoría vacía; DELETE rechazado.</td>
+  <td>Correcto.</td>
+</tr>
+<tr>
+  <td>E03 — agente IA</td>
+  <td>Cuenta 1500 clientes; INSERT rechazado.</td>
+  <td>Correcto.</td>
+</tr>
+<tr>
+  <td>E03 — final</td>
+  <td>Cuatro PASS y ROLLBACK; ejecutor finaliza sin error.</td>
+  <td>Correcto; no es un respaldo real. Las secuencias pueden haber avanzado.</td>
+</tr>
+<tr>
+  <td>E04 — gerente/TI/auditor</td>
+  <td>Cada conexión devuelve <code>session_user</code> y <code>current_user</code> iguales a la cuenta correspondiente, TLS 1.3 y <code>verify-full</code>.</td>
+  <td>Correcto para las tres cuentas.</td>
+</tr>
+<tr>
+  <td>E04 — clave incorrecta</td>
+  <td>Rechazo específico <code>password authentication failed</code>.</td>
+  <td>Correcto; no se confundió con un error de red o certificado.</td>
+</tr>
+</tbody>
+</table>
+
+<h2>Diagnóstico completo al final del archivo aportado</h2>
+
+<p>La base indicó <code>2026-11-16 14:20:37.572822-06</code>. La ejecución terminó sin error.</p>
+
+<table>
+<thead>
+<tr>
+  <th>Comprobación</th>
+  <th>Resultado observado</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>Motor y base</td>
+  <td>PostgreSQL 16.14, base <code>nutrianimales</code>; operador administrativo <code>postgres</code>.</td>
+</tr>
+<tr>
+  <td>Objetos seleccionados</td>
+  <td>Los 11 objetos consultados existen: tablas de negocio/soporte y tres reportes. Esto no es un conteo total del esquema.</td>
+</tr>
+<tr>
+  <td>Cuentas y grupos seleccionados</td>
+  <td>Nueve filas; todos sin superusuario, CREATEDB ni CREATEROLE. Los tres grupos son NOLOGIN.</td>
+</tr>
+<tr>
+  <td>Membresías</td>
+  <td><code>gerente_db</code> → <code>rol_gerente</code>; <code>ti_db</code> → <code>rol_ti</code>; <code>auditor_db</code> → <code>rol_auditor</code>.</td>
+</tr>
+<tr>
+  <td>Esquemas</td>
+  <td><code>public</code> pertenece a <code>pg_database_owner</code>; <code>n8n</code> pertenece a <code>n8n_app</code>. No se inició n8n en esta instancia.</td>
+</tr>
+<tr>
+  <td>Cuatro triggers por fila</td>
+  <td>Productos, lotes, clientes y ventas, todos con <code>tgenabled = O</code>. Esto acredita presencia/habilitación; la demostración empresarial antes/después la aporta B.</td>
+</tr>
+<tr>
+  <td>Parámetros activos</td>
+  <td><code>log_connections=on</code>, <code>password_encryption=scram-sha-256</code>, <code>shared_preload_libraries=pg_stat_statements</code>, <code>ssl=on</code>.</td>
+</tr>
+<tr>
+  <td>Reglas HBA</td>
+  <td>Socket local de <code>postgres</code> con <code>trust</code>; otras cuentas locales con SCRAM; regla de red <code>hostssl</code> en <code>samenet</code> con SCRAM; reglas de rechazo IPv4/IPv6; ninguna fila con error.</td>
+</tr>
+</tbody>
+</table>
+
+<h2>Trazabilidad del código ejecutado</h2>
+
+<p>Los tres SHA-256 impresos por el ejecutor coinciden con los archivos fuente
+normalizados a LF incluidos en el paquete:</p>
+
+<table>
+<thead>
+<tr>
+  <th>Archivo</th>
+  <th>SHA-256 observado y comparado</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>03_pruebas_rbac.sql</code></td>
+  <td><code>07B87732C8F7AB77B0F81CC4BD5E69C8C72D445CE52B0C31886A1F0505F23D76</code></td>
+</tr>
+<tr>
+  <td><code>04_autenticacion_tls.sh</code></td>
+  <td><code>A1648015297F85758D7B7B702CDD8E38EC9AFDB8D19527F9B23520CCB3835E33</code></td>
+</tr>
+<tr>
+  <td><code>01_diagnostico.sql</code></td>
+  <td><code>6F2197D1D8F63E64E1A20158BABAD138B1A4504E92CD14667199F361CB73FACD</code></td>
+</tr>
+</tbody>
+</table>
+
+<p>El registro de consola indica que se generaron estos archivos individuales en la PC:</p>
+
+<ul>
+<li><code>20261116-141649-634-Pruebas.txt</code>.</li>
+<li><code>20261116-141930-861-Autenticacion.txt</code>.</li>
+<li><code>20261116-142036-917-Diagnostico.txt</code>.</li>
+</ul>
+
+<h2>Alcance y siguiente cierre</h2>
+
+<p>Las verificaciones técnicas E01–E04 descritas aquí están comprobadas en la PC de E.
+No acreditan las alertas R/H/D, los ataques del equipo, la revocación Groq, una
+restauración de respaldos ni la instalación de otro integrante. La publicación
+de la rama y la compilación final conjunta siguen pendientes de su evidencia.</p>
+</article><article id="seccion-2"><h1>Aporte de E al informe final</h1>
+
+<p><strong>Proyecto:</strong> seguridad de sistemas de NutriAnimales S.A. — Grupo 3.
+<strong>Fecha de pruebas locales:</strong> 16 de noviembre de 2026.
+<strong>Código base:</strong> A/B <code>8ea8c12500aa7375ea11f57c406d7b11211c4190</code>.
+<strong>Rama de aporte:</strong> <code>feature/integrante5-riesgos-rbac</code>.</p>
+
+<p>Este texto cubre riesgos, RBAC y secretos. El informe completo del grupo debe
+incorporar las evidencias de infraestructura, triggers, alertas, ataques y rotación
+que corresponden a A/B/C/D. No se presenta este aporte aislado como el informe
+completo de 15–20 páginas solicitado en la guía.</p>
+
+<h2>Análisis de riesgos</h2>
+
+<p>El análisis tomó como activos los datos ficticios de clientes, ventas, inventario
+y producción, junto con la auditoría, las cuentas y los servicios que procesan esa
+información. Se valoraron cinco amenazas con una escala de probabilidad e impacto
+de 1 a 5 y se multiplicaron ambas puntuaciones. Esto permitió priorizar la exposición
+de credenciales y los accesos o modificaciones indebidos, además de considerar la
+pérdida del canal seguro y las lecturas masivas mediante cuentas legítimas.</p>
+
+<table>
+<thead>
+<tr>
+  <th>Amenaza</th>
+  <th>Inicial</th>
+  <th>Tratamiento principal</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>Acceso no autorizado a PostgreSQL</td>
+  <td>15 — alto</td>
+  <td>TLS/SCRAM, puerto sin publicación y separación de cuentas/permisos.</td>
+</tr>
+<tr>
+  <td>Alteración o borrado sin trazabilidad</td>
+  <td>15 — alto</td>
+  <td>Auditoría por fila/sentencia y protección de sus tablas.</td>
+</tr>
+<tr>
+  <td>Exposición de secretos</td>
+  <td>20 — crítico</td>
+  <td>Custodia privada, exclusión de Git, revocación y actualización del consumidor.</td>
+</tr>
+<tr>
+  <td>Degradación de TLS/autenticación</td>
+  <td>10 — medio</td>
+  <td>Configuración aprobada, baseline y verificación del cliente/monitoreo.</td>
+</tr>
+<tr>
+  <td>Lectura masiva con cuenta válida</td>
+  <td>15 — alto</td>
+  <td>Reportes agregados, catálogo del bot, límites y observación de consultas.</td>
+</tr>
+</tbody>
+</table>
+
+<p>La matriz completa de <a href="#seccion-9">MATRIZ<em>RIESGOS</em>E.md</a> registra activos,
+responsables, controles y estimaciones residuales. Estas cifras son una valoración
+académica. No representan una reducción de riesgo medida automáticamente.
+La ausencia de un puerto publicado no elimina el abuso de una credencial robada,
+y una cuenta de lectura puede seguir siendo utilizada para extraer información.</p>
+
+<h2>Control de acceso por roles</h2>
+
+<p>Se aprovechó el diseño de B, con tres grupos de permisos: <code>rol_gerente</code>, <code>rol_ti</code>
+y <code>rol_auditor</code>. Cada uno se asigna a una cuenta LOGIN propia. El gerente consulta
+tres reportes agregados; TI puede leer información y registrar respaldos/alertas;
+el auditor consulta registros sin poder modificarlos. Las tres cuentas carecen de
+superusuario. La administración de aprovisionamiento queda separada en <code>postgres</code>.</p>
+
+<p>El 16 de noviembre se inició en la PC de E una instancia PostgreSQL 16.14 desde
+el SQL de A/B. Docker informó el servicio saludable y las consultas confirmaron
+la base <code>nutrianimales</code>, la existencia de grupos/cuentas y sus flags de login.
+Luego se consultaron privilegios efectivos, que incluyen permisos heredados.</p>
+
+<table>
+<thead>
+<tr>
+  <th>Cuenta</th>
+  <th>Lee reporte de ventas</th>
+  <th>Lee auditoría</th>
+  <th>INSERT en registro de respaldos</th>
+  <th>DELETE de auditoría</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>gerente_db</td>
+  <td>Sí</td>
+  <td>No</td>
+  <td>No</td>
+  <td>No</td>
+</tr>
+<tr>
+  <td>ti_db</td>
+  <td>Sí</td>
+  <td>Sí</td>
+  <td>Sí</td>
+  <td>No</td>
+</tr>
+<tr>
+  <td>auditor_db</td>
+  <td>No</td>
+  <td>Sí</td>
+  <td>No</td>
+  <td>No</td>
+</tr>
+</tbody>
+</table>
+
+<p>Estos resultados están acreditados por las capturas E01/E02. Se preparó además
+un ensayo E03 que ejecuta acciones permitidas y prohibidas bajo cada rol efectivo.
+Utiliza una transacción y revierte la fila temporal de respaldo al terminar. Un
+<code>PASS</code> solo se genera al recibir la denegación de privilegios correspondiente.
+Si la operación prohibida se permite o aparece otro error, la prueba falla.</p>
+
+<p><strong>Resultado E03 observado:</strong> las lecturas permitidas funcionaron; TI insertó una
+fila con estado <code>prueba_rbac_no_respaldo</code>; PostgreSQL rechazó la lectura de auditoría
+del gerente, el DELETE de auditoría de TI y auditor y el INSERT de clientes del
+agente. Se registraron cuatro <code>PASS</code> y un <code>ROLLBACK</code> final. La fila de ensayo quedó
+revertida; no se creó un respaldo. El agente pudo contar 1500 clientes ficticios.</p>
+
+<p>La autenticación se verifica por separado en E04, con conexiones TCP y contraseña
+como las tres cuentas. El cliente exige TLS <code>verify-full</code> y se comprueba la identidad
+de sesión y el canal en <code>pg_stat_ssl</code>. Se añade un intento con clave incorrecta.
+<strong>Resultado E04 observado:</strong> gerente, TI y auditor iniciaron sesión con su propia
+identidad y TLS 1.3; el cliente utilizó <code>verify-full</code>. La contraseña incorrecta fue
+rechazada específicamente con <code>password authentication failed</code>. El uso de
+<code>SET LOCAL ROLE</code> en E03 se documenta por separado de este login TCP real; ambos
+se realizaron en la instancia local de E, sin simular otra máquina.</p>
+
+<p>El diagnóstico del 16/11/2026 a las 14:20:37, zona -06:00 indicada por la base,
+confirmó los once objetos consultados, las tres membresías correctas y cuatro
+triggers por fila habilitados. También mostró <code>ssl=on</code>, cifrado de contraseñas
+SCRAM-SHA-256, <code>pg_stat_statements</code> precargado y reglas HBA sin errores de análisis.
+La regla de socket administrativo local para <code>postgres</code> usa <code>trust</code>; las demás
+cuentas locales y los accesos <code>hostssl</code> permitidos utilizan SCRAM. No se afirma
+que todas las conexiones locales exijan contraseña.</p>
+
+<p>La salida original está en <a href="parte-e/evidencias/Evidencias_Parte_E.txt">Evidencias<em>Parte</em>E.txt</a>
+y las capturas E03/E04 en <a href="#seccion-1">RESULTADOS_E.md</a>.
+Los hashes de los tres archivos ejecutados coinciden con sus fuentes entregadas.</p>
+
+<h2>Gestión de secretos</h2>
+
+<p>El inventario de E identifica consumidores, custodios y acciones de cambio de cada
+secreto sin incluir su valor. Se distingue una contraseña de cuenta de la clave
+que n8n utiliza para cifrar credenciales. Para las pruebas locales se generaron
+diez valores independientes con un generador criptográfico y se verificó que
+<code>.env</code> está excluido de Git. Telegram y Groq permanecieron vacíos en esta instancia
+porque el ensayo RBAC no los necesita.</p>
+
+<p>La preparación local de E generó su propia pareja TLS en un volumen Linux de Docker.
+El repositorio actual de A/B excluye las claves privadas. La revisión histórica
+había encontrado una clave seguida por Git en el <code>main</code> antiguo: su retirada no
+acredita por sí sola la sustitución de una clave aún usada en otro despliegue.
+A debe confirmar el tratamiento y la pareja vigente del entorno del grupo.</p>
+
+<p>El procedimiento de rotación requiere cambiar el secreto donde realmente se valida,
+actualizar el consumidor y comprobar funcionamiento con la nueva credencial y
+rechazo de la anterior. Cambiar una variable <code>.env</code> no modifica una contraseña de
+PostgreSQL ya inicializada. El reemplazo de la clave de cifrado n8n requiere un
+procedimiento compatible con la versión y una recuperación comprobada.</p>
+
+<p>La demostración Groq debe incorporar el funcionamiento inicial, la revocación real,
+el rechazo del proveedor con la misma credencial y la recuperación con otra. Esa
+evidencia corresponde a D. Un error por límite de uso o modelo inválido no acredita
+la revocación. Esta versión no la declara ejecutada por E.</p>
+
+<h2>Alcance y limitaciones</h2>
+
+<p>Las pruebas locales de E usan Docker Desktop desde Windows y el mismo SQL de A/B.
+Para resolver permisos de clave privada y finales de línea se agregó un complemento
+Compose, manteniendo los archivos originales. Se inició solo PostgreSQL y su
+preparación: esto no certifica el despliegue completo del grupo ni las 17 alertas.</p>
+
+<p>El informe final debe reunir pruebas del código integrado, indicando entorno,
+fecha, comando, resultado y responsable. También debe distinguir un registro de
+respaldo de una copia realmente exportada/restaurada. Los administradores de la
+base o del anfitrión conservan capacidad de intervenir, por lo que esta auditoría
+local no equivale a un registro externo inmutable.</p>
+
+<h2>Integración del informe del equipo</h2>
+
+<table>
+<thead>
+<tr>
+  <th>Apartado</th>
+  <th>Fuente de evidencia</th>
+  <th>Trabajo de E para compilar</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>Contexto, objetivos y arquitectura</td>
+  <td>Grupo y A</td>
+  <td>Unificar Grupo 3, empresa, servicios y alcance.</td>
+</tr>
+<tr>
+  <td>Doce controles de hardening</td>
+  <td>A</td>
+  <td>Integrar capturas y explicar qué control está probado.</td>
+</tr>
+<tr>
+  <td>Datos, cuatro triggers y auditoría</td>
+  <td>B</td>
+  <td>Relacionar cambio, usuario, antes/después y registro.</td>
+</tr>
+<tr>
+  <td>Riesgos, RBAC y secretos</td>
+  <td>E/B/A/D</td>
+  <td>Incluir esta matriz, resultados E y tratamiento real de secretos.</td>
+</tr>
+<tr>
+  <td>R1–R5 y H1–H5</td>
+  <td>C</td>
+  <td>Tabla con fuente, umbral, ejecución y mensaje real.</td>
+</tr>
+<tr>
+  <td>D1–D7 y ataques A1–A5</td>
+  <td>D</td>
+  <td>Vincular acción, detección, respuesta y restauración del estado.</td>
+</tr>
+<tr>
+  <td>Revocación Groq</td>
+  <td>D</td>
+  <td>Incorporar las cuatro etapas sin mostrar la clave.</td>
+</tr>
+<tr>
+  <td>Resultados, límites y conclusiones</td>
+  <td>Todos</td>
+  <td>Evitar declarar completos controles pendientes; identificar la versión presentada.</td>
+</tr>
+</tbody>
+</table>
+
+<h2>Referencias para el aporte</h2>
+
+<p>PostgreSQL Global Development Group. Documentación de PostgreSQL 16:
+<a href="https://www.postgresql.org/docs/16/ddl-priv.html">privilegios</a>,
+<a href="https://www.postgresql.org/docs/16/sql-set-role.html">SET ROLE</a>,
+<a href="https://www.postgresql.org/docs/16/functions-info.html">funciones de información</a> y
+<a href="https://www.postgresql.org/docs/16/libpq-ssl.html">SSL</a>.</p>
+
+<p>n8n. <a href="https://docs.n8n.io/hosting/configuration/configuration-examples/encryption-key/">Configuración de clave de cifrado</a>.</p>
+
+<p>Docker. <a href="https://docs.docker.com/reference/compose-file/merge/">Combinación de archivos Compose</a>.</p>
+
+<p>Fuentes del caso: guía del proyecto aportada por el curso; SQL/Compose del
+repositorio del grupo en el commit identificado; capturas reales del integrante E.</p>
+</article><article id="seccion-3"><h1>Cierre de la parte E</h1>
+
+<h2>Estado después de revisar las evidencias locales E01–E04</h2>
+
+<ul>
+<li>[x] Clon de la rama A/B actualizada y rama propia de E creada.</li>
+<li>[x] <code>.env</code> generado sin mostrar valores; exclusión Git comprobada.</li>
+<li>[x] Adaptación Windows agregada; configuración Compose validada.</li>
+<li>[x] PostgreSQL 16.14 iniciado y saludable.</li>
+<li>[x] Grupos/cuentas sin superusuario comprobados en E01.</li>
+<li>[x] Matriz efectiva de tres cuentas comprobada en E02.</li>
+<li>[x] Cinco riesgos elaborados con responsables, controles y residual estimado.</li>
+<li>[x] Inventario de secretos y tratamiento de exposición documentados.</li>
+<li>[x] Aporte al informe y guion personal preparados con alcance explícito.</li>
+<li>[x] E03 ejecutado: acciones permitidas y cuatro rechazos correctos; ROLLBACK final.</li>
+<li>[x] E04 ejecutado: tres logins TCP/TLS y rechazo por contraseña incorrecta.</li>
+<li>[x] Diagnóstico completo/membresías guardado mediante <code>Diagnostico</code>.</li>
+<li>[x] RESULTADOS<em>E y APORTE</em>INFORME_E actualizados con esas salidas reales.</li>
+<li>[ ] Archivos revisados, commit creado y rama remota publicada.</li>
+</ul>
+
+<h2>Coordinación de la entrega conjunta</h2>
+
+<ul>
+<li>[ ] A confirma tratamiento de la clave histórica y evidencia de secretos del despliegue del grupo.</li>
+<li>[ ] Evidencias A/B/C/D integradas al informe final y ensayo de exposición coordinado.</li>
+</ul>
+
+<p>E no está al 100% por existir documentación: se cierran los puntos con pruebas y
+entrega real. Tampoco se debe bloquear el aporte local de E esperando usar la PC
+de otro integrante; se identifica cada entorno y se compila la evidencia del grupo.</p>
+
+<h2>Revisión antes de agregar archivos</h2>
+
+<div class="codehilite">
+<pre><span></span><code><span class="n">git</span> <span class="n">branch</span> <span class="p">-</span><span class="n">-show-current</span>
+<span class="n">git</span> <span class="n">status</span> <span class="p">-</span><span class="n">-short</span>
+<span class="n">git</span> <span class="n">check-ignore</span> <span class="n">-v</span> <span class="p">--</span> <span class="p">.</span><span class="n">env</span>
+<span class="n">git</span> <span class="nb">diff </span><span class="p">-</span><span class="n">-check</span>
+</code></pre>
+</div>
+
+<p>La rama debe ser <code>feature/integrante5-riesgos-rbac</code>. La exclusión de <code>.env</code> ya fue
+comprobada; repetirla antes de publicar mantiene visible ese control. <code>diff --check</code>
+detecta problemas de espacios en archivos modificados, no fugas de secretos.
+Revisar los textos/capturas nuevos y no incorporar volcados, claves ni credenciales.</p>
+
+<h2>Agregar únicamente el aporte de E</h2>
+
+<div class="codehilite">
+<pre><span></span><code><span class="n">git</span> <span class="n">add</span> <span class="p">--</span> <span class="n">compose</span><span class="p">.</span><span class="n">parte-e</span><span class="p">.</span><span class="n">windows</span><span class="p">.</span><span class="n">yaml</span> <span class="n">parte-e</span> <span class="n">ABRIR_GUIA_PARTE_E</span><span class="p">.</span><span class="n">html</span>
+<span class="n">git</span> <span class="nb">diff </span><span class="p">-</span><span class="n">-cached</span> <span class="p">-</span><span class="n">-check</span>
+<span class="n">git</span> <span class="nb">diff </span><span class="p">-</span><span class="n">-cached</span> <span class="p">-</span><span class="n">-stat</span>
+<span class="n">git</span> <span class="nb">diff </span><span class="p">-</span><span class="n">-cached</span> <span class="p">-</span><span class="n">-name-only</span>
+</code></pre>
+</div>
+
+<p><code>--</code> separa rutas de opciones y la lista limita lo preparado a este aporte.
+<code>--cached</code> revisa el área que entrará al commit; <code>--stat</code> resume tamaño/cambios;
+<code>--name-only</code> enumera archivos. Antes del commit, confirmar que los resultados y
+documentos ya reflejan las pruebas efectivamente realizadas.</p>
+
+<h2>Crear commit y publicar la rama</h2>
+
+<div class="codehilite">
+<pre><span></span><code><span class="n">git</span> <span class="n">commit</span> <span class="n">-m</span> <span class="s2">"feat(E): documentar riesgos, RBAC y secretos con evidencias"</span>
+<span class="n">git</span> <span class="n">push</span> <span class="n">-u</span> <span class="n">origin</span> <span class="n">feature</span><span class="p">/</span><span class="n">integrante5-riesgos-rbac</span>
+</code></pre>
+</div>
+
+<p><code>commit</code> guarda la versión local; <code>push</code> la publica en la rama indicada y <code>-u</code>
+establece seguimiento. Si Git solicita identidad, configurar el nombre/correo
+propios del integrante; no copiar la identidad de Julio. Si GitHub rechaza permisos,
+resolver el acceso o publicar en un fork propio y solicitar integración sin forzar
+el remoto. No utilizar <code>--force</code>.</p>
+
+<h2>Verificación posterior</h2>
+
+<div class="codehilite">
+<pre><span></span><code><span class="n">git</span> <span class="n">status</span> <span class="p">-</span><span class="n">-short</span> <span class="p">-</span><span class="n">-branch</span>
+<span class="n">git</span> <span class="n">log</span> <span class="p">-</span><span class="n">1</span> <span class="p">-</span><span class="n">-oneline</span>
+<span class="n">git</span> <span class="n">ls-remote</span> <span class="p">-</span><span class="n">-heads</span> <span class="n">origin</span> <span class="n">feature</span><span class="p">/</span><span class="n">integrante5-riesgos-rbac</span>
+</code></pre>
+</div>
+
+<p>Comparar el commit publicado con el local y revisar la rama en GitHub. Un mensaje
+de commit local no acredita que se haya subido. Coordinar que A/B se integre en
+<code>main</code> antes de evaluar el diff final de E contra <code>main</code>; E partió de ese trabajo.</p>
+
+<p>No borrar volúmenes para preparar el commit. Los datos y claves privadas viven
+fuera del árbol de archivos que se añade a Git.</p>
+</article><article id="seccion-4"><h1>Explicación de comandos y código de E</h1>
+
+<p>Todos los comandos de Docker de este aporte apuntan al proyecto <code>nutrianimales-e</code>
+y combinan <code>compose.yaml</code> con <code>compose.parte-e.windows.yaml</code>. Ejecutarlos desde la
+raíz del clon. La selección explícita evita consultar accidentalmente otra instancia.</p>
+
+<h2>Comandos ya usados</h2>
+
+<table>
+<thead>
+<tr>
+  <th>Comando / fragmento</th>
+  <th>Qué hace y para qué</th>
+  <th>Por qué esa opción</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>git --version</code></td>
+  <td>Consulta versión de Git.</td>
+  <td>Verifica la herramienta antes de clonar.</td>
+</tr>
+<tr>
+  <td><code>git clone --branch feature/integrantes-A_B URL DESTINO</code></td>
+  <td>Copia el repositorio y parte de la rama A/B actualizada.</td>
+  <td>El <code>main</code> revisado inicialmente no tenía todos esos cambios; E necesita el mismo SQL actualizado del equipo.</td>
+</tr>
+<tr>
+  <td><code>cd RUTA</code></td>
+  <td>Cambia al clon de E.</td>
+  <td>Resuelve archivos y <code>.env</code> desde la raíz correcta.</td>
+</tr>
+<tr>
+  <td><code>git switch -c feature/integrante5-riesgos-rbac</code></td>
+  <td>Crea una rama propia desde el commit actual.</td>
+  <td>Mantiene el aporte separado y revisable.</td>
+</tr>
+<tr>
+  <td><code>docker version</code></td>
+  <td>Consulta cliente y motor Docker.</td>
+  <td>Que exista el comando no implica que el motor esté activo.</td>
+</tr>
+<tr>
+  <td><code>wsl --list --verbose</code></td>
+  <td>Enumera distribuciones y versión WSL.</td>
+  <td>Permitió confirmar Docker Desktop con WSL2; E no necesitó instalar Ubuntu.</td>
+</tr>
+<tr>
+  <td><code>docker pull postgres:16.14</code></td>
+  <td>Descarga la imagen exacta de PostgreSQL.</td>
+  <td>Coincide con el Compose del equipo.</td>
+</tr>
+<tr>
+  <td><code>git check-ignore -v -- .env</code></td>
+  <td>Muestra la regla que excluye ese archivo.</td>
+  <td><code>-v</code> identifica archivo/línea/regla y <code>--</code> separa la ruta de las opciones; no lee valores.</td>
+</tr>
+<tr>
+  <td><code>Expand-Archive -LiteralPath ZIP -DestinationPath $PWD.Path</code></td>
+  <td>Extrae el complemento en el clon actual.</td>
+  <td><code>-LiteralPath</code> evita interpretar comodines y el destino es el directorio de trabajo real.</td>
+</tr>
+<tr>
+  <td><code>Test-Path .\compose.parte-e.windows.yaml</code></td>
+  <td>Comprueba existencia del archivo.</td>
+  <td>Una respuesta <code>True</code> verifica que se extrajo donde corresponde.</td>
+</tr>
+</tbody>
+</table>
+
+<h2>Generación de <code>.env</code> ejecutada por E</h2>
+
+<table>
+<thead>
+<tr>
+  <th>Bloque</th>
+  <th>Función / motivo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>&amp; { ... }</code></td>
+  <td>Ejecuta un bloque con variables locales de trabajo.</td>
+</tr>
+<tr>
+  <td><code>Test-Path .env</code> y <code>throw</code> si existe</td>
+  <td>Evita reemplazar credenciales existentes por accidente.</td>
+</tr>
+<tr>
+  <td><code>RandomNumberGenerator.Create()</code></td>
+  <td>Usa aleatoriedad criptográfica del sistema.</td>
+</tr>
+<tr>
+  <td><code>foreach</code> sobre diez nombres</td>
+  <td>Genera un valor independiente para cada consumidor.</td>
+</tr>
+<tr>
+  <td><code>New-Object byte[] 32</code> y <code>GetBytes</code></td>
+  <td>Obtiene 32 bytes aleatorios por secreto, no una palabra reutilizada.</td>
+</tr>
+<tr>
+  <td><code>BitConverter...Replace...ToLowerInvariant</code></td>
+  <td>Representa los bytes como 64 caracteres hexadecimales, cómodos para <code>.env</code> sin comillas especiales.</td>
+</tr>
+<tr>
+  <td>Correo de prueba y campos Telegram/Groq vacíos</td>
+  <td>Completa configuración no necesaria para RBAC sin inventar tokens.</td>
+</tr>
+<tr>
+  <td><code>WriteAllLines</code> con UTF-8 sin BOM</td>
+  <td>Guarda variables sin imprimir su contenido; evita un BOM en el primer nombre.</td>
+</tr>
+<tr>
+  <td><code>Dispose()</code></td>
+  <td>Libera el generador.</td>
+</tr>
+<tr>
+  <td><code>Write-Host</code> del mensaje de finalización</td>
+  <td>Confirma creación sin mostrar secretos.</td>
+</tr>
+</tbody>
+</table>
+
+<p>Ese bloque no asignó permisos NTFS ni cambió contraseñas de una base ya existente.
+En este caso precedió a la inicialización de la nueva base de E.</p>
+
+<h2>Docker Compose</h2>
+
+<p>Prefijo utilizado por el ejecutor:</p>
+
+<div class="codehilite">
+<pre><span></span><code>docker compose -p nutrianimales-e -f compose.yaml -f compose.parte-e.windows.yaml
+</code></pre>
+</div>
+
+<table>
+<thead>
+<tr>
+  <th>Opción / subcomando</th>
+  <th>Función y motivo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>-p nutrianimales-e</code></td>
+  <td>Identifica la red y los volúmenes de esta instancia local.</td>
+</tr>
+<tr>
+  <td>Primer <code>-f</code></td>
+  <td>Lee el proyecto original del grupo.</td>
+</tr>
+<tr>
+  <td>Segundo <code>-f</code></td>
+  <td>Aplica las sustituciones específicas de Windows.</td>
+</tr>
+<tr>
+  <td><code>config --quiet</code></td>
+  <td>Valida sin imprimir el modelo con secretos interpolados.</td>
+</tr>
+<tr>
+  <td><code>up -d --wait --wait-timeout 180 postgres</code></td>
+  <td>Inicia la base y su preparación, en segundo plano, esperando salud hasta 180 segundos.</td>
+</tr>
+<tr>
+  <td><code>ps -a</code></td>
+  <td>Muestra también el preparador ya terminado.</td>
+</tr>
+<tr>
+  <td><code>exec -T postgres ...</code></td>
+  <td>Ejecuta en la base activa sin asignar TTY; apropiado para archivos y captura de salida.</td>
+</tr>
+<tr>
+  <td><code>cp ORIGEN postgres:DESTINO</code></td>
+  <td>Transfiere un archivo de prueba al contenedor. No toca el SQL original de inicialización.</td>
+</tr>
+<tr>
+  <td><code>logs --tail 60 preparar-e postgres</code></td>
+  <td>Acota registros de diagnóstico de arranque. Revisar antes de compartir; no son prueba RBAC por sí solos.</td>
+</tr>
+</tbody>
+</table>
+
+<p>La explicación de cada montaje, dependencia y permiso del complemento está en
+<a href="#seccion-11">windows/LEEME.md</a>. La base sigue usando los archivos de
+configuración de A/B y no publica su puerto en Windows.</p>
+
+<h2>Ejecutor PowerShell</h2>
+
+<div class="codehilite">
+<pre><span></span><code><span class="n">powershell</span> <span class="n">-NoProfile</span> <span class="n">-ExecutionPolicy</span> <span class="n">Bypass</span> <span class="o">-File</span> <span class="p">.\</span><span class="n">parte-e</span><span class="p">\</span><span class="n">Ejecutar-E</span><span class="p">.</span><span class="n">ps1</span> <span class="n">-Paso</span> <span class="n">Pruebas</span>
+</code></pre>
+</div>
+
+<table>
+<thead>
+<tr>
+  <th>Bloque / instrucción</th>
+  <th>Función y motivo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>-NoProfile</code></td>
+  <td>Evita funciones/alias particulares del perfil del usuario.</td>
+</tr>
+<tr>
+  <td><code>-ExecutionPolicy Bypass</code></td>
+  <td>Permite este script local en el proceso iniciado; no eleva privilegios ni cambia la política permanente.</td>
+</tr>
+<tr>
+  <td><code>-File</code> y <code>-Paso</code></td>
+  <td>Seleccionan archivo y prueba; <code>ValidateSet</code> limita el nombre a cinco opciones conocidas.</td>
+</tr>
+<tr>
+  <td><code>$ErrorActionPreference='Stop'</code></td>
+  <td>Detiene errores de archivos y operaciones PowerShell. Los comandos nativos se comprueban con su código.</td>
+</tr>
+<tr>
+  <td><code>$PSScriptRoot</code>, <code>Split-Path</code>, <code>Join-Path</code>, <code>Test-Path</code></td>
+  <td>Calculan rutas desde el propio script y validan los archivos necesarios.</td>
+</tr>
+<tr>
+  <td><code>Get-Command docker</code></td>
+  <td>Detecta si la herramienta está disponible antes de ejecutar.</td>
+</tr>
+<tr>
+  <td><code>New-Item -Force</code></td>
+  <td>Crea carpetas si faltan sin vaciar las existentes.</td>
+</tr>
+<tr>
+  <td><code>Get-Date</code> y <code>DateTimeOffset</code></td>
+  <td>Identifican la ejecución e incluyen zona horaria real de la computadora.</td>
+</tr>
+<tr>
+  <td><code>Set-Content</code></td>
+  <td>Crea el encabezado de evidencia; no copia <code>.env</code>.</td>
+</tr>
+<tr>
+  <td><code>Invoke-DockerE</code>, <code>@composeE</code>, <code>@ArgumentosE</code></td>
+  <td>Pasa cada argumento como elemento separado, conservando rutas con espacios.</td>
+</tr>
+<tr>
+  <td><code>2&gt;&amp;1</code></td>
+  <td>Captura también NOTICE y errores nativos; psql envía allí las denegaciones esperadas.</td>
+</tr>
+<tr>
+  <td>Preferencia <code>Continue</code> temporal</td>
+  <td>Evita que una NOTICE se convierta en terminación de PowerShell 5.1; la salida sigue guardada y el código de error manda.</td>
+</tr>
+<tr>
+  <td><code>$LASTEXITCODE</code>, comprobación y <code>throw</code></td>
+  <td>Un fallo de Docker/Bash/psql interrumpe el paso y señala su archivo de evidencia.</td>
+</tr>
+<tr>
+  <td><code>ForEach-Object ... ToString()</code></td>
+  <td>Convierte salida nativa en texto legible para consola y archivo.</td>
+</tr>
+<tr>
+  <td><code>Tee-Object -Append</code></td>
+  <td>Muestra y conserva el mismo resultado.</td>
+</tr>
+<tr>
+  <td>Tabla fija de archivos y <code>Todos</code></td>
+  <td>Ejecuta exclusivamente las pruebas incluidas, en orden.</td>
+</tr>
+<tr>
+  <td><code>ReadAllText</code>, normalización LF y <code>WriteAllText</code></td>
+  <td>Prepara una copia reproducible del código en <code>.runtime</code>, aunque el checkout use CRLF.</td>
+</tr>
+<tr>
+  <td><code>Get-FileHash -Algorithm SHA256</code></td>
+  <td>Identifica el archivo realmente transferido; no calcula hashes de contraseñas.</td>
+</tr>
+<tr>
+  <td><code>Push-Location</code> y <code>finally { Pop-Location }</code></td>
+  <td>Resuelven Compose desde la raíz y restauran después el directorio de la terminal.</td>
+</tr>
+</tbody>
+</table>
+
+<h2>Cliente psql</h2>
+
+<table>
+<thead>
+<tr>
+  <th>Fragmento</th>
+  <th>Función y motivo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>-X</code></td>
+  <td>Omite <code>psqlrc</code>; hace reproducible la sesión.</td>
+</tr>
+<tr>
+  <td><code>-U postgres</code></td>
+  <td>Usa administración solo para catálogos y SET ROLE; no afirma que esa cuenta tenga mínimo privilegio.</td>
+</tr>
+<tr>
+  <td><code>-d nutrianimales</code></td>
+  <td>Selecciona la base del equipo.</td>
+</tr>
+<tr>
+  <td><code>-v ON_ERROR_STOP=1</code> / <code>\set ON_ERROR_STOP on</code></td>
+  <td>Detiene errores SQL no controlados; evita continuar y declarar éxito después de un fallo.</td>
+</tr>
+<tr>
+  <td><code>-f ARCHIVO</code></td>
+  <td>Ejecuta exactamente el archivo de prueba copiado.</td>
+</tr>
+<tr>
+  <td><code>-c CONSULTA</code></td>
+  <td>Ejecuta las consultas cortas utilizadas en las capturas iniciales.</td>
+</tr>
+<tr>
+  <td><code>-P pager=off</code> / <code>\pset pager off</code></td>
+  <td>Evita que un paginador bloquee una ejecución capturada.</td>
+</tr>
+<tr>
+  <td><code>-w</code></td>
+  <td>En autenticación automatizada no permite un prompt interactivo oculto que dejaría esperando el script.</td>
+</tr>
+<tr>
+  <td><code>-qAt</code></td>
+  <td>Reduce ruido y entrega filas sin encabezados, con campos separados, para validar identidad/TLS.</td>
+</tr>
+</tbody>
+</table>
+
+<h2>SQL E01 y E02</h2>
+
+<table>
+<thead>
+<tr>
+  <th>Instrucción o conjunto</th>
+  <th>Función y motivo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>\echo</code></td>
+  <td>Etiqueta inicio/fin de cada paso; no representa un resultado de la prueba.</td>
+</tr>
+<tr>
+  <td><code>current_database</code>, <code>current_user</code>, <code>version</code>, <code>clock_timestamp</code></td>
+  <td>Identifican base, ejecutor, motor e instante real.</td>
+</tr>
+<tr>
+  <td><code>unnest(ARRAY[...])</code></td>
+  <td>Convierte una lista fija de objetos/cuentas en filas consultables.</td>
+</tr>
+<tr>
+  <td><code>to_regclass</code></td>
+  <td>Detecta presencia de objetos sin crearlos.</td>
+</tr>
+<tr>
+  <td><code>pg_roles</code> y sus flags</td>
+  <td>Distingue NOLOGIN/LOGIN y privilegios administrativos sin leer hashes de contraseñas.</td>
+</tr>
+<tr>
+  <td><code>pg_auth_members</code> y JOIN a <code>pg_roles</code></td>
+  <td>Muestran qué grupo hereda cada cuenta.</td>
+</tr>
+<tr>
+  <td><code>pg_namespace</code> / <code>pg_get_userbyid</code></td>
+  <td>Verifican propietarios de esquemas <code>public</code> y <code>n8n</code>.</td>
+</tr>
+<tr>
+  <td><code>pg_trigger</code>, filtro <code>NOT tgisinternal</code> y nombre</td>
+  <td>Localizan los cuatro triggers por fila del proyecto.</td>
+</tr>
+<tr>
+  <td><code>pg_settings</code> y <code>pg_hba_file_rules</code></td>
+  <td>Consultan parámetros/reglas actuales, sin leer claves privadas ni valores de <code>.env</code>.</td>
+</tr>
+<tr>
+  <td><code>has_table_privilege</code></td>
+  <td>Evalúa un privilegio efectivo de una cuenta sobre un objeto; incluye herencia.</td>
+</tr>
+<tr>
+  <td><code>CROSS JOIN</code></td>
+  <td>Compara cada una de cuatro cuentas con cada uno de cinco objetos en la matriz completa.</td>
+</tr>
+<tr>
+  <td><code>has_database_privilege</code> / <code>has_schema_privilege</code></td>
+  <td>Revisa CONNECT, USAGE y CREATE, además de permisos sobre tablas.</td>
+</tr>
+<tr>
+  <td><code>ORDER BY</code></td>
+  <td>Mantiene un orden fácil de comparar entre ejecuciones.</td>
+</tr>
+</tbody>
+</table>
+
+<h2>SQL E03</h2>
+
+<table>
+<thead>
+<tr>
+  <th>Instrucción o bloque</th>
+  <th>Función y motivo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>BEGIN</code></td>
+  <td>Agrupa las operaciones de ensayo en una transacción.</td>
+</tr>
+<tr>
+  <td><code>SET LOCAL ROLE cuenta</code></td>
+  <td>Cambia la identidad efectiva de autorización dentro de esa transacción.</td>
+</tr>
+<tr>
+  <td><code>SELECT session_user, current_user</code></td>
+  <td>Hace visible la diferencia entre operador original y rol probado.</td>
+</tr>
+<tr>
+  <td><code>SELECT count(*)</code> sobre reportes/auditoría/clientes</td>
+  <td>Ejecuta una lectura permitida sin mostrar filas con correos u otros valores empresariales.</td>
+</tr>
+<tr>
+  <td><code>INSERT INTO backups ... RETURNING</code></td>
+  <td>Comprueba escritura permitida de TI, marcándola expresamente como ensayo sin respaldo real.</td>
+</tr>
+<tr>
+  <td>Bloque <code>DO</code> y <code>BEGIN ... EXCEPTION</code> interno</td>
+  <td>Permite comprobar una denegación sin abortar las demás pruebas esperadas.</td>
+</tr>
+<tr>
+  <td><code>DELETE ... WHERE false</code> / <code>INSERT ... SELECT ... WHERE false</code></td>
+  <td>Solicita el privilegio de escritura sin seleccionar filas que pudieran cambiar.</td>
+</tr>
+<tr>
+  <td><code>RAISE EXCEPTION 'FALLO...'</code></td>
+  <td>Si la acción prohibida se admite, convierte el resultado en error de la prueba.</td>
+</tr>
+<tr>
+  <td><code>WHEN insufficient_privilege</code></td>
+  <td>Captura solo la falta de privilegios, no cualquier error.</td>
+</tr>
+<tr>
+  <td><code>RAISE NOTICE 'PASS...'</code></td>
+  <td>Registra éxito únicamente después de una denegación del motor.</td>
+</tr>
+<tr>
+  <td><code>RESET ROLE</code></td>
+  <td>Regresa al operador administrativo antes de probar la siguiente cuenta.</td>
+</tr>
+<tr>
+  <td><code>ROLLBACK</code></td>
+  <td>Revierte filas del ensayo, incluida <code>backups</code>; no revierte secuencias ni elimina logs técnicos.</td>
+</tr>
+</tbody>
+</table>
+
+<h2>Bash E04: login y TLS</h2>
+
+<table>
+<thead>
+<tr>
+  <th>Instrucción o bloque</th>
+  <th>Función y motivo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>Shebang y <code>set -euo pipefail</code></td>
+  <td>Indican Bash y detienen errores/variables inexistentes/tuberías fallidas.</td>
+</tr>
+<tr>
+  <td><code>umask 077</code></td>
+  <td>Crea el archivo temporal de error privado.</td>
+</tr>
+<tr>
+  <td><code>PGHOST=postgres</code> / <code>PGDATABASE=nutrianimales</code></td>
+  <td>Seleccionan una conexión TCP al servicio correcto, sin publicar 5432.</td>
+</tr>
+<tr>
+  <td><code>PGSSLMODE=verify-full</code> / <code>PGSSLROOTCERT</code></td>
+  <td>Exigen cifrado, confianza y nombre válido del servidor.</td>
+</tr>
+<tr>
+  <td><code>PGCONNECT_TIMEOUT=5</code></td>
+  <td>Evita esperas indefinidas si hay un problema de conexión.</td>
+</tr>
+<tr>
+  <td><code>PGCLIENTENCODING=UTF8</code> / <code>LC_ALL=C</code></td>
+  <td>Fijan codificación y mensajes del cliente para una captura consistente.</td>
+</tr>
+<tr>
+  <td><code>test -r</code></td>
+  <td>Verifica que el certificado público esté disponible.</td>
+</tr>
+<tr>
+  <td>Bucle de tres pares cuenta:variable</td>
+  <td>Revisa las tres cuentas usando una lista fija.</td>
+</tr>
+<tr>
+  <td><code>${par%%:*}</code> / <code>${par#*:}</code></td>
+  <td>Separan nombre de cuenta y nombre de variable del par.</td>
+</tr>
+<tr>
+  <td><code>${!variable}</code></td>
+  <td>Lee por nombre la variable ya presente dentro del contenedor; no la imprime.</td>
+</tr>
+<tr>
+  <td><code>PGUSER=... PGPASSWORD=... psql</code></td>
+  <td>Pasa la contraseña como entorno del proceso, sin incluirla en argumentos ni historial PowerShell. El administrador de la máquina sigue pudiendo acceder al entorno.</td>
+</tr>
+<tr>
+  <td>Consulta de <code>pg_stat_ssl</code> con <code>pg_backend_pid()</code></td>
+  <td>Obtiene TLS de la propia conexión, junto con identidades reales de sesión/rol.</td>
+</tr>
+<tr>
+  <td>`IFS='</td>
+  <td>' read` y condición</td>
+  <td>Separa el resultado y exige cuenta correcta y SSL activo antes de emitir PASS.</td>
+</tr>
+<tr>
+  <td><code>mktemp</code> y <code>trap ... EXIT</code></td>
+  <td>Crean y retiran un archivo privado aun si hay fallo.</td>
+</tr>
+<tr>
+  <td>Intento único con clave incorrecta</td>
+  <td>Comprueba que se exige una credencial válida, sin intentar adivinar secretos.</td>
+</tr>
+<tr>
+  <td><code>grep</code> de rechazo de autenticación</td>
+  <td>Distingue password incorrecto de un fallo de red/certificado; este último no cuenta como aprobado.</td>
+</tr>
+<tr>
+  <td><code>printf</code></td>
+  <td>Muestra identidad, protocolo y resultado; nunca el secreto.</td>
+</tr>
+</tbody>
+</table>
+
+<h2>Git para revisar y publicar E</h2>
+
+<p>Seguir <a href="#seccion-3">CHECKLIST<em>CIERRE</em>E.md</a> después de ejecutar las pruebas.
+No se fusionan ramas de otros integrantes ni se modifica <code>main</code> como parte de este paso.
+<code>git add -- RUTAS</code> limita lo que se prepara; <code>git diff --cached</code> revisa lo preparado;
+<code>commit</code> crea la versión local y <code>push -u</code> publica la rama y fija su seguimiento.</p>
+</article><article id="seccion-5"><h1>Coordinación y guion personal</h1>
+
+<h2>Evidencia que E reúne del equipo</h2>
+
+<table>
+<thead>
+<tr>
+  <th>Integrante</th>
+  <th>Entrega necesaria para cerrar el informe</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>A</td>
+  <td>Arquitectura y doce controles; TLS y permisos del despliegue real; tratamiento de clave histórica si se utilizó; arranque documentado.</td>
+</tr>
+<tr>
+  <td>B</td>
+  <td>Tablas/datos, cuatro triggers por fila, auditoría por sentencia, UPDATE/DELETE antes/después y roles definitivos.</td>
+</tr>
+<tr>
+  <td>C</td>
+  <td>R1–R5 y H1–H5: fuente/umbral, prueba y mensaje Telegram reales.</td>
+</tr>
+<tr>
+  <td>D</td>
+  <td>D1–D7, ataques A1–A5 y las cuatro etapas de revocación/recuperación Groq.</td>
+</tr>
+<tr>
+  <td>E</td>
+  <td>Cinco riesgos, inventario de secretos, E01–E04, documentación y compilación coherente con las evidencias.</td>
+</tr>
+</tbody>
+</table>
+
+<p>Cada archivo debe indicar acción/comando, entorno/versión, fecha, resultado,
+significado y responsable. No hace falta usar la PC de Julio para producir E;
+sí hace falta identificar qué se comprobó localmente y qué en el despliegue conjunto.</p>
+
+<p>Texto opcional para copiar al chat del grupo; no se ha enviado:</p>
+
+<blockquote>
+  <p>Estoy cerrando E en mi propia PC con el SQL de A/B y mi rama de riesgos/RBAC.
+  Pásenme sus evidencias finales con acción, resultado, fecha y versión del código:
+  A, hardening/TLS; B, tablas y triggers; C, R/H; D, D1–D7, ataques y revocación Groq.
+  No envíen .env, tokens, claves privadas ni capturas de credenciales. Yo unifico
+  riesgos, resultados, limitaciones y el informe. La entrega debe coincidir con la
+  versión integrada que vamos a mostrar.</p>
+</blockquote>
+
+<h2>Reparto sugerido de los 15 minutos</h2>
+
+<table>
+<thead>
+<tr>
+  <th>Participación</th>
+  <th style="text-align:right;">Tiempo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>A: caso, arquitectura y hardening</td>
+  <td style="text-align:right;">2:30</td>
+</tr>
+<tr>
+  <td>B: datos, roles y triggers</td>
+  <td style="text-align:right;">2:30</td>
+</tr>
+<tr>
+  <td>C: monitoreo R/H</td>
+  <td style="text-align:right;">3:00</td>
+</tr>
+<tr>
+  <td>D: alertas de datos, ataques y revocación</td>
+  <td style="text-align:right;">3:30</td>
+</tr>
+<tr>
+  <td>E: riesgos, pruebas RBAC, secretos y cierre</td>
+  <td style="text-align:right;">2:00</td>
+</tr>
+<tr>
+  <td>Margen conjunto para transiciones o demora de demo</td>
+  <td style="text-align:right;">1:30</td>
+</tr>
+<tr>
+  <td>Total</td>
+  <td style="text-align:right;">15:00</td>
+</tr>
+</tbody>
+</table>
+
+<h2>Guion de E, aproximadamente dos minutos</h2>
+
+<p>«Mi parte fue revisar los riesgos, comprobar la separación de permisos y organizar
+la gestión de secretos y la evidencia del informe.</p>
+
+<p>Identificamos cinco amenazas: acceso no autorizado a la base, cambios sin
+trazabilidad, exposición de credenciales, degradación de TLS y lecturas masivas
+con cuentas válidas. Para priorizarlas usamos probabilidad por impacto. La
+exposición de secretos quedó como riesgo crítico porque una credencial filtrada
+puede dar acceso aunque la aplicación esté configurada correctamente.</p>
+
+<p>Para RBAC aprovechamos los roles del equipo y los verificamos en PostgreSQL 16.14.
+El gerente recibe reportes agregados; TI puede leer registros y registrar
+respaldos o alertas; el auditor consulta evidencia. Las tres cuentas existen sin
+superusuario. La matriz efectiva confirmó que ninguna tiene permiso para borrar
+la auditoría. [Mostrar E01 y E02].</p>
+
+<p>Después intentamos acciones con cada rol.
+Las lecturas autorizadas funcionaron y las operaciones prohibidas fueron
+rechazadas por PostgreSQL. El ensayo terminó con ROLLBACK para revertir la fila de
+prueba; esa fila no representa un respaldo real. [Mostrar su salida].</p>
+
+<p>Además comprobamos el login de las tres
+cuentas con contraseña y TLS, y el rechazo de una contraseña incorrecta. Esa es
+la diferencia entre verificar permisos y verificar autenticación.</p>
+
+<p>En secretos, el inventario registra qué usa cada componente, quién lo custodia y
+cómo se cambia, sin mostrar valores. Comprobamos que .env esté fuera de Git.
+Si un secreto se publica, hay que revocarlo o reemplazarlo y actualizar su
+consumidor; borrarlo del último commit no resuelve la exposición.</p>
+
+<p>Finalmente, el informe relaciona cada riesgo con su control y su evidencia.
+Las capturas de mi PC acreditan estas pruebas locales; las alertas y ataques se
+documentan con las ejecuciones de los compañeros en la versión del grupo.»</p>
+
+<p>E03/E04 ya están comprobadas en la PC de E y sus párrafos pueden exponerse como
+resultados. Los corchetes solo indican qué evidencia mostrar; no se leen en voz
+alta. No declarar la revocación Groq como propia si la realizó D.</p>
+
+<h2>Respuestas breves a preguntas del profesor</h2>
+
+<table>
+<thead>
+<tr>
+  <th>Pregunta</th>
+  <th>Respuesta</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>¿Por qué tres roles si trabajan en una PC?</td>
+  <td>RBAC separa identidades y permisos; la IP y la máquina no definen el rol SQL.</td>
+</tr>
+<tr>
+  <td>¿Por qué el gerente no ve auditoría?</td>
+  <td>Su necesidad es consultar reportes; no requiere los registros internos ni datos detallados.</td>
+</tr>
+<tr>
+  <td>¿Por qué TI no es superusuario?</td>
+  <td>Las tareas normales de soporte no necesitan poder borrar evidencia ni administrar todas las cuentas.</td>
+</tr>
+<tr>
+  <td>¿SET ROLE prueba la contraseña?</td>
+  <td>No. Cambia el usuario efectivo para autorización. El login con contraseña se prueba aparte.</td>
+</tr>
+<tr>
+  <td>¿ROLLBACK revierte todo?</td>
+  <td>Revierte las filas de la transacción; secuencias, estadísticas y logs técnicos pueden reflejar la prueba.</td>
+</tr>
+<tr>
+  <td>¿Una cuenta de solo lectura es inocua?</td>
+  <td>No. Puede extraer datos o consumir recursos; por eso importan vistas, límites y observación.</td>
+</tr>
+<tr>
+  <td>¿.gitignore protege por completo un secreto?</td>
+  <td>Evita incorporaciones ordinarias futuras; no restringe por sí solo permisos del disco ni revoca lo ya publicado.</td>
+</tr>
+<tr>
+  <td>¿Cambiar .env rota la contraseña PostgreSQL?</td>
+  <td>No en una base existente: hay que cambiar la contraseña del rol y actualizar el consumidor.</td>
+</tr>
+<tr>
+  <td>¿Qué queda fuera del alcance?</td>
+  <td>Producción real, protección frente al administrador de la máquina y certificación de otro despliegue solo con estas capturas locales.</td>
+</tr>
+</tbody>
+</table>
+
+<h2>Pregunta interesante para el profesor</h2>
+
+<p>«Si un administrador de PostgreSQL todavía puede alterar la auditoría local,
+¿qué arquitectura recomendaría para conservar evidencia confiable frente a una
+cuenta administrativa comprometida, y cómo la evaluaríamos sin dar privilegios
+excesivos al sistema que recoge los registros?»</p>
+</article><article id="seccion-6"><h1>Revisión de la base usada por E</h1>
+
+<p>Revisión del 16/11/2026. Repositorio: <code>Julio-Orozco/nutrianimales-security</code>.
+Base de E: rama <code>feature/integrantes-A_B</code>, commit
+<code>8ea8c12500aa7375ea11f57c406d7b11211c4190</code>.</p>
+
+<h2>Lo que ya existe y E aprovecha</h2>
+
+<ul>
+<li>El Compose utiliza PostgreSQL 16.14 y la base <code>nutrianimales</code> sin publicar 5432.</li>
+<li>Los archivos <code>.sqb</code> son SQL del equipo; el inicializador <code>00-init.sh</code> los ejecuta
+explícitamente con psql. Su extensión no significa que falte el esquema.</li>
+<li>Se definen tres grupos de negocio, sus cuentas LOGIN, cuentas técnicas y ACL.</li>
+<li>El esquema tiene ocho tablas empresariales, seis de soporte y tres vistas de
+reportes, además de objetos de la extensión. No son solamente diez tablas.</li>
+<li>Existen cuatro triggers por fila para productos, clientes, ventas y lotes,
+además de ocho triggers por sentencia para UPDATE/DELETE.</li>
+<li>La función por fila registra <code>session_user</code>, usa <code>SECURITY DEFINER</code> con un
+<code>search_path</code> fijo y tiene un propietario NOLOGIN dedicado.</li>
+<li>La rama actual incorpora <code>06-n8n.sqb</code>: crea <code>n8n_app</code>, su esquema y los permisos
+que necesita TypeORM. No debe repetirse el hallazgo antiguo de que falta esa cuenta.</li>
+<li>HBA usa <code>samenet</code> y exige SCRAM sobre TLS para conexiones de red autorizadas.</li>
+<li>Nginx publica solo en loopback; los certificados y claves se generan localmente
+con la preparación de A/B. La clave histórica ya no está en el árbol de A/B.</li>
+</ul>
+
+<h2>Qué agrega E</h2>
+
+<p>E no vuelve a implementar los roles de B. Verifica sus permisos efectivos y sus
+rechazos, prepara el inventario/política de secretos, prioriza cinco riesgos y
+organiza el informe. Para ejecutar en su PC Windows agrega un complemento Compose
+que coloca init, TLS y logs en volúmenes Linux, sin reescribir los originales.
+La nueva rama contiene estas pruebas, documentación y evidencias.</p>
+
+<h2>Hechos comprobados en la PC de E</h2>
+
+<p>El arranque quedó saludable. El motor informó versión 16.14; los tres grupos y las
+tres cuentas existen, sin superusuario. La matriz de cuatro privilegios por cuenta
+coincidió con el diseño. Ver <a href="#seccion-1">RESULTADOS_E.md</a>.
+E03 se ejecutó y obtuvo cuatro denegaciones correctas, con ROLLBACK final.
+E04 obtuvo tres logins reales con TLS 1.3 y verificó rechazo de clave incorrecta.
+El diagnóstico completo confirmó las membresías y los once objetos consultados,
+cuatro triggers por fila habilitados y configuración TLS/SCRAM activa.
+La regla administrativa local de <code>postgres</code> usa <code>trust</code>, como indica el HBA;
+la autenticación de otras cuentas y conexiones de red autorizadas utiliza SCRAM.</p>
+
+<h2>Límites y pendientes de integración</h2>
+
+<table>
+<thead>
+<tr>
+  <th>Punto</th>
+  <th>Evaluación y acción</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>Alertas R/H/D y bot</td>
+  <td>Las ramas de C/D se integran y prueban en el entorno del grupo; la instancia local de E solo inició PostgreSQL. Tener JSON no acredita alertas enviadas.</td>
+</tr>
+<tr>
+  <td>Documentación heredada</td>
+  <td><code>docs/SECRETOS.md</code> del equipo conserva instrucciones antiguas de Python marcadas como no aplicables. Para el aporte actual usar este inventario de E y los flujos n8n finales.</td>
+</tr>
+<tr>
+  <td>Historia de la clave TLS</td>
+  <td>Retirada de Git en A/B no equivale a revocación o sustitución en un servidor ya desplegado. A confirma la pareja vigente del grupo; E tiene una nueva local.</td>
+</tr>
+<tr>
+  <td>Red de Docker</td>
+  <td>La red es un bridge dedicado; no tiene <code>internal: true</code>. No publicar 5432 reduce exposición, pero no impide accesos desde otros contenedores con credenciales válidas.</td>
+</tr>
+<tr>
+  <td>Imágenes y registros</td>
+  <td>PostgreSQL está fijado en 16.14; Nginx/pgAdmin usan <code>latest</code> y n8n tiene log de depuración en esta base. A debe valorar fijación de imágenes y reducción de logs para una entrega reproducible sin secretos. No se cambian dentro de E.</td>
+</tr>
+<tr>
+  <td>Credencial de lectura</td>
+  <td><code>agente_ia</code> puede leer tablas empresariales completas. Los reportes y límites del bot no eliminan el riesgo de usar directamente esa cuenta fuera del bot.</td>
+</tr>
+<tr>
+  <td>Recuperación</td>
+  <td>Una tabla <code>backups</code> y volúmenes persistentes no acreditan dump, copia externa ni restauración. Solicitar evidencia del procedimiento realmente utilizado.</td>
+</tr>
+<tr>
+  <td>Revisión de código frente a ejecución</td>
+  <td>Las capturas de E pertenecen a su propia instancia. Identificar versión y entorno de las evidencias de los demás antes de compilar el informe final.</td>
+</tr>
+</tbody>
+</table>
+
+<p>El aporte de E debe revisarse contra <code>main</code> después de que A/B esté integrado.
+Mientras tanto, su rama conserva el mismo ancestro A/B para evitar trabajar con el
+<code>main</code> antiguo y perder los cambios que permitieron arrancar la base actual.</p>
+</article><article id="seccion-7"><h1>Inventario y gestión de secretos</h1>
+
+<p><strong>Grupo 3 · NutriAnimales S.A. · Responsable de inventario: E.</strong>
+Este documento identifica credenciales, consumidores y responsables, sin registrar
+valores. Corresponde al Compose de A/B <code>8ea8c12500aa7375ea11f57c406d7b11211c4190</code>;
+los flujos finales de C/D deben confirmar sus credenciales nativas n8n.</p>
+
+<h2>Inventario</h2>
+
+<table>
+<thead>
+<tr>
+  <th>Nombre o material</th>
+  <th>Consumidor / finalidad</th>
+  <th>Custodia prevista</th>
+  <th>Responsable</th>
+  <th>Cambio y recuperación</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>POSTGRES_PASSWORD</code></td>
+  <td>Cuenta <code>postgres</code>; aprovisionamiento y administración.</td>
+  <td><code>.env</code> privado y secreto almacenado por PostgreSQL.</td>
+  <td>A/B</td>
+  <td>Cambiar la contraseña del rol existente; actualizar configuración de administración. No usarla como credencial de flujos.</td>
+</tr>
+<tr>
+  <td><code>GERENTE_PASSWORD</code></td>
+  <td>Login <code>gerente_db</code>; reportes agregados.</td>
+  <td><code>.env</code> privado; entregar solo al usuario autorizado si se usa login manual.</td>
+  <td>B/E</td>
+  <td>Revocar/cambiar al exponerla o retirar el acceso; comprobar un login nuevo y que el secreto anterior falle.</td>
+</tr>
+<tr>
+  <td><code>TI_PASSWORD</code></td>
+  <td>Login <code>ti_db</code>; soporte con permisos limitados.</td>
+  <td>Igual custodia privada, sin compartir entre roles.</td>
+  <td>B/E</td>
+  <td>Cambiar el rol y actualizar sus clientes autorizados.</td>
+</tr>
+<tr>
+  <td><code>AUDITOR_PASSWORD</code></td>
+  <td>Login <code>auditor_db</code>; lectura de evidencia.</td>
+  <td>Custodia privada y acceso asignado al auditor.</td>
+  <td>B/E</td>
+  <td>Retirar acceso o cambiar credencial cuando cambie el responsable o haya exposición.</td>
+</tr>
+<tr>
+  <td><code>AGENTE_IA_PASSWORD</code></td>
+  <td>Login <code>agente_ia</code>; consultas empresariales de lectura del bot.</td>
+  <td><code>.env</code> y credencial Postgres de n8n del flujo correspondiente.</td>
+  <td>B/D</td>
+  <td>Cambiar en PostgreSQL y credencial n8n; probar consulta permitida y rechazo de escritura.</td>
+</tr>
+<tr>
+  <td><code>MONITOR_PASSWORD</code></td>
+  <td>Login <code>monitor_db</code>; consultas de monitoreo y funciones autorizadas.</td>
+  <td><code>.env</code> y credencial Postgres n8n usada por C/D.</td>
+  <td>B/C/D</td>
+  <td>Actualizar rol y credenciales de consumidores; probar consulta y siguiente ejecución del flujo.</td>
+</tr>
+<tr>
+  <td><code>BACKUP_PASSWORD</code></td>
+  <td>Login <code>backup_db</code>; exportación y registro de respaldos.</td>
+  <td><code>.env</code> y mecanismo privado del proceso de copia, si se implementa.</td>
+  <td>A/B</td>
+  <td>Actualizar cuenta y proceso; verificar un respaldo/restauración sin publicar su contenido.</td>
+</tr>
+<tr>
+  <td><code>N8N_DB_PASSWORD</code></td>
+  <td><code>n8n_app</code>; tablas internas del esquema <code>n8n</code>.</td>
+  <td><code>.env</code>; variable de conexión de n8n en Compose.</td>
+  <td>A/B</td>
+  <td>Cambiar contraseña en la BD existente, actualizar <code>.env</code> y recrear el consumidor n8n.</td>
+</tr>
+<tr>
+  <td><code>N8N_ENCRYPTION_KEY</code></td>
+  <td>Cifrado de credenciales persistidas por n8n; no es una contraseña de acceso.</td>
+  <td><code>.env</code> y copia privada separada de recuperación.</td>
+  <td>A</td>
+  <td>Preservar con el respaldo de la instancia; rotar solo con el procedimiento compatible con la versión, comprobando que las credenciales sigan siendo utilizables.</td>
+</tr>
+<tr>
+  <td><code>PGADMIN_DEFAULT_PASSWORD</code></td>
+  <td>Aprovisionamiento inicial de la cuenta pgAdmin.</td>
+  <td><code>.env</code> privado; cuenta persistida por la herramienta.</td>
+  <td>A</td>
+  <td>Cambiar desde la cuenta existente cuando ya fue inicializada; no asumir que editar la variable cambia esa cuenta.</td>
+</tr>
+<tr>
+  <td><code>TELEGRAM_BOT_TOKEN</code> o credencial Telegram</td>
+  <td>Bot emisor/receptor de mensajes de alertas.</td>
+  <td>Credencial cifrada de n8n del flujo de C/D; variable opcional solo si existe un consumidor configurado.</td>
+  <td>C/D</td>
+  <td>Revocar en BotFather del bot propio, configurar reemplazo y probar envío/recepción.</td>
+</tr>
+<tr>
+  <td><code>GROQ_API_KEY</code> o credencial Groq</td>
+  <td>Solicitudes al proveedor IA del flujo del bot.</td>
+  <td>Credencial cifrada de n8n o mecanismo aprobado por D; evitar ponerla en nodos/exportaciones JSON.</td>
+  <td>D/E</td>
+  <td>Revocar la clave usada en la demo, guardar rechazo real, crear otra y probar recuperación.</td>
+</tr>
+<tr>
+  <td>Claves privadas TLS Nginx/PostgreSQL</td>
+  <td>Identidad del servidor; no son certificados públicos.</td>
+  <td>En el despliegue A: archivos privados excluidos de Git. En E: clave PostgreSQL dentro del volumen Linux de Docker con modo 600.</td>
+  <td>A</td>
+  <td>Generar pareja nueva ante exposición y distribuir el certificado/CA de confianza a los clientes.</td>
+</tr>
+<tr>
+  <td>Contraseña de la cuenta propietaria n8n</td>
+  <td>Acceso humano al editor y a la administración de credenciales.</td>
+  <td>Gestor privado del responsable; no inventar una variable <code>N8N_PASSWORD</code> que este Compose no utiliza.</td>
+  <td>A</td>
+  <td>Gestionar desde la cuenta de n8n y probar nuevo acceso, siguiendo la versión instalada.</td>
+</tr>
+</tbody>
+</table>
+
+<p><code>PGADMIN_DEFAULT_EMAIL</code> y <code>TELEGRAM_CHAT_ID</code> son identificadores; no sustituyen una
+contraseña o token. El chat ID puede ser información interna y debe compartirse
+solo cuando resulte necesario para la configuración.</p>
+
+<h2>Estado real en la PC de E</h2>
+
+<ul>
+<li>Se generaron diez valores aleatorios independientes, de 32 bytes cada uno,
+mediante el generador criptográfico de .NET. No se imprimieron en pantalla.</li>
+<li>Git confirmó que <code>.env</code> está excluido por <code>.gitignore</code> (captura E00).</li>
+<li>Telegram y Groq se dejaron vacíos porque las pruebas RBAC no los necesitan.
+Eso no acredita que el bot o la IA estén configurados en esta instancia.</li>
+<li>El preparador Windows generó la pareja TLS de esta instancia en un volumen
+Linux y aplica propietario <code>postgres</code> y permiso 600 a la clave. PostgreSQL
+arrancó. No se añadió material privado TLS al paquete de E.</li>
+<li>El archivo <code>.env</code> permanece en Windows: ignorarlo en Git no prueba una ACL
+NTFS restrictiva. No se reporta <code>chmod 600</code> sobre NTFS como ejecutado.</li>
+<li>E04 confirmó que gerente, TI y auditor pueden autenticarse con sus contraseñas
+actuales, usando TLS 1.3 y verificación del certificado/nombre. Un intento con
+clave incorrecta fue rechazado. Esto verificó autenticación; no rotó esas claves.</li>
+</ul>
+
+<p>En Ubuntu del despliegue del grupo, A debe conservar la evidencia de <code>.env</code> con
+permisos restrictivos. En Windows se aplican ACL del sistema de archivos; los
+administradores del anfitrión y de Docker siguen teniendo poder sobre el entorno.
+Este laboratorio usa variables de entorno: no se presenta como un gestor central
+de secretos ni como aislamiento frente al administrador de la máquina.</p>
+
+<h2>Exposición histórica de material TLS</h2>
+
+<p>En la revisión del antiguo <code>main</code> (<code>62f91ee</code>) se identificó una clave privada TLS
+seguida por Git. La base A/B actual ya excluye los archivos privados y no sigue
+esa clave. Son dos estados distintos: retirar el archivo actual no prueba que una
+credencial publicada deje de servir. A debe confirmar que el despliegue del grupo
+utiliza una pareja nueva y que los clientes confían en el certificado vigente.</p>
+
+<p>La instancia de E generó su propia pareja local después del clon. No se copia
+la clave histórica al informe, las evidencias ni el repositorio.</p>
+
+<h2>Procedimiento de cambio de contraseña PostgreSQL existente</h2>
+
+<ol>
+<li>Identificar la cuenta y sus consumidores; programar el cambio sin tocar otras cuentas.</li>
+<li>Abrir un cliente administrativo interactivo y usar <code>\password nombre_cuenta</code>
+con prompt oculto, o un mecanismo privado equivalente. No escribir la clave en
+una línea de terminal capturable.</li>
+<li>Actualizar el secreto en la configuración local privada y en la credencial del
+consumidor. Para variables de entorno, recrear solo el servicio consumidor
+correspondiente; un reinicio no garantiza leer un <code>.env</code> cambiado.</li>
+<li>Probar una conexión nueva con la clave nueva y una operación permitida.
+Confirmar que la clave anterior ya no permite un login nuevo. Las sesiones ya
+abiertas requieren tratamiento aparte si el motivo fue una exposición.</li>
+<li>Registrar responsable, instante y resultado sin guardar ninguno de los valores.</li>
+</ol>
+
+<p>Cambiar solo <code>.env</code> <strong>no cambia</strong> una contraseña de una base ya inicializada.
+La inicialización del volumen no se repite como mecanismo de rotación.
+Este procedimiento es documental: E no cambia contraseñas del equipo sin necesidad.</p>
+
+<h2>Revocación Groq que debe aportar D</h2>
+
+<table>
+<thead>
+<tr>
+  <th>Etapa</th>
+  <th>Evidencia válida sin secreto</th>
+  <th>Interpretación</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>Antes</td>
+  <td>Solicitud del flujo con respuesta real usando una clave propia del laboratorio.</td>
+  <td>El consumidor funcionaba.</td>
+</tr>
+<tr>
+  <td>Revocación</td>
+  <td>Acción en el proveedor identificada sin mostrar la clave.</td>
+  <td>Se invalidó la credencial utilizada.</td>
+</tr>
+<tr>
+  <td>Después</td>
+  <td>Nuevo intento con esa misma credencial y rechazo de autenticación del proveedor.</td>
+  <td>Un 401 puede acreditar rechazo; un 429 o error de modelo por sí solo no acredita revocación.</td>
+</tr>
+<tr>
+  <td>Recuperación</td>
+  <td>Credencial reemplazada en n8n y ejecución exitosa real.</td>
+  <td>El consumidor se recuperó sin reintroducir el secreto anterior.</td>
+</tr>
+</tbody>
+</table>
+
+<p>No se usan los antiguos comandos Python <code>lab.py</code>/<code>monitor</code>: no son la arquitectura
+actual de este repo. E compila la evidencia que D ejecute y la vincula a ER3.
+En el paquete actual esa demostración sigue pendiente de evidencia del responsable.</p>
+
+<h2>Cierre ante exposición</h2>
+
+<p>Revocar o renovar el secreto efectivo, actualizar consumidores, probar funcionamiento
+y rechazo del anterior, revisar accesos y retirar el material de publicaciones o
+historial según corresponda. Borrar un archivo de un commit no sustituye revocar.
+Registrar solo el tipo de secreto, responsable, fecha, motivo y resultado.</p>
+
+<p>Para recuperación n8n, conservar de forma privada y conjunta datos/metadata,
+credenciales cifradas y la clave necesaria para descifrarlas, además de roles,
+configuración y certificados. Copiar al mismo disco no cubre la pérdida del anfitrión.</p>
+
+<p>Referencias: <a href="https://docs.n8n.io/hosting/configuration/configuration-examples/encryption-key/">n8n: clave de cifrado</a>,
+<a href="https://www.postgresql.org/docs/16/sql-alterrole.html">PostgreSQL: ALTER ROLE</a>,
+<a href="https://www.postgresql.org/docs/16/app-psql.html">psql y password</a>,
+<a href="https://hub.docker.com/_/postgres">imagen oficial PostgreSQL</a>,
+<a href="https://www.postgresql.org/docs/16/ssl-tcp.html">SSL y clave privada</a>.</p>
+</article><article id="seccion-8"><h1>Tres roles SQL y mínimo privilegio</h1>
+
+<p>Fuente de diseño: <code>db/sql/01-roles.sqb</code>, <code>05-access.sqb</code> y <code>06-n8n.sqb</code> de A/B,
+commit <code>8ea8c12500aa7375ea11f57c406d7b11211c4190</code>.
+Resultados locales E01–E04: <a href="#seccion-1">registro de evidencias</a>.</p>
+
+<p>Un grupo NOLOGIN reúne permisos; una cuenta LOGIN inicia sesión y hereda su grupo.
+Son identidades PostgreSQL, independientes de usuarios de Windows, direcciones IP
+y cuentas del panel n8n. No hacen falta tres computadoras para demostrar RBAC.</p>
+
+<table>
+<thead>
+<tr>
+  <th>Rol</th>
+  <th>Grupo y cuenta</th>
+  <th>Permitido por el SQL</th>
+  <th>No concedido</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>Gerente</td>
+  <td><code>rol_gerente</code> → <code>gerente_db</code></td>
+  <td>SELECT en <code>reporte_ventas</code>, <code>reporte_inventario</code>, <code>reporte_produccion</code>.</td>
+  <td>Leer auditoría, consultar directamente clientes o escribir datos.</td>
+</tr>
+<tr>
+  <td>TI</td>
+  <td><code>rol_ti</code> → <code>ti_db</code></td>
+  <td>SELECT en tablas/vistas <code>public</code> existentes; INSERT en <code>backups</code> y <code>alertas_auditoria</code>; uso de secuencias.</td>
+  <td>Borrar/modificar auditoría; administración global de usuarios.</td>
+</tr>
+<tr>
+  <td>Auditor</td>
+  <td><code>rol_auditor</code> → <code>auditor_db</code></td>
+  <td>SELECT en auditoría de datos/sentencias, eventos, respaldos, alertas y baseline; observación mediante <code>pg_monitor</code>.</td>
+  <td>Escribir en esas tablas o consultar los reportes empresariales no concedidos.</td>
+</tr>
+</tbody>
+</table>
+
+<p>Las tres cuentas existen sin superusuario, como se vio en la captura E01.
+<code>postgres</code> se reserva al aprovisionamiento y a las comprobaciones administrativas.
+El rol auditor permite ver evidencia que puede contener datos sensibles: no debe
+interpretarse como ausencia de acceso a toda información empresarial.</p>
+
+<h2>Cuentas técnicas adicionales</h2>
+
+<table>
+<thead>
+<tr>
+  <th>Cuenta</th>
+  <th>Función y alcance</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>agente_ia</code></td>
+  <td>SELECT en ocho tablas empresariales y tres reportes. Tiene <code>default_transaction_read_only=on</code>, timeout de sentencia y bloqueo; la frontera de escritura la ponen también sus ACL.</td>
+</tr>
+<tr>
+  <td><code>monitor_db</code></td>
+  <td>Lectura y observación; INSERT/UPDATE en alertas; ejecución de funciones concretas de snapshot/eventos. No es la cuenta de tablas internas n8n.</td>
+</tr>
+<tr>
+  <td><code>backup_db</code></td>
+  <td><code>pg_read_all_data</code> para exportar y permiso de registrar respaldos. No equivale a una copia ya creada o restaurada.</td>
+</tr>
+<tr>
+  <td><code>n8n_app</code></td>
+  <td>Dueño del esquema <code>n8n</code>; CONNECT y CREATE sobre la base por la inicialización de TypeORM. Sin acceso concedido a tablas/secuencias empresariales de <code>public</code>.</td>
+</tr>
+<tr>
+  <td><code>audit_owner</code></td>
+  <td>NOLOGIN, propietario de funciones de auditoría y con inserción en sus tablas. Permite registrar cambios sin dar escritura directa a las cuentas de negocio.</td>
+</tr>
+</tbody>
+</table>
+
+<p>Los <code>GRANT ... ON ALL TABLES</code> de este diseño se aplican a los objetos existentes.
+Las tablas futuras requieren revisar permisos y repetir la matriz, no asumir que
+heredan automáticamente los mismos privilegios.</p>
+
+<h2>Tres niveles de comprobación</h2>
+
+<ol>
+<li><strong>E01:</strong> consulta roles, membresías, objetos y configuración activa sin leer secretos.</li>
+<li><strong>E02:</strong> <code>has_table_privilege</code> muestra permisos efectivos, incluidos los heredados.</li>
+<li><strong>E03:</strong> <code>SET LOCAL ROLE</code> cambia la identidad de autorización dentro de una transacción y ejecuta acciones.</li>
+</ol>
+
+<p>En E03, <code>session_user</code> sigue siendo <code>postgres</code> y <code>current_user</code> es la cuenta probada.
+Esto comprueba autorización del motor, no la contraseña ni todos los ajustes de
+una sesión recién iniciada. El <code>ROLLBACK</code> revierte la fila de ensayo de respaldos;
+las secuencias y registros técnicos pueden reflejar el intento.</p>
+
+<table>
+<thead>
+<tr>
+  <th>Cuenta en E03</th>
+  <th>Operación permitida</th>
+  <th>Operación que debe fallar</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>gerente_db</td>
+  <td>Contar grupos de <code>reporte_ventas</code>.</td>
+  <td>Leer <code>auditoria_datos</code>.</td>
+</tr>
+<tr>
+  <td>ti_db</td>
+  <td>Leer auditoría; insertar una fila de ensayo en <code>backups</code>.</td>
+  <td>DELETE sobre auditoría, con <code>WHERE false</code> para no seleccionar filas.</td>
+</tr>
+<tr>
+  <td>auditor_db</td>
+  <td>Leer auditoría.</td>
+  <td>DELETE sobre auditoría, también sin seleccionar filas.</td>
+</tr>
+<tr>
+  <td>agente_ia</td>
+  <td>Contar clientes ficticios.</td>
+  <td>INSERT sin filas en clientes.</td>
+</tr>
+</tbody>
+</table>
+
+<p>Los bloques <code>DO</code> solo capturan <code>insufficient_privilege</code>. Si se permite la operación
+prohibida, lanzan <code>FALLO</code> y el cliente se detiene. Un error distinto también detiene
+el ensayo. No se imprime PASS de forma incondicional.</p>
+
+<h2>E04: autenticación real y canal TLS</h2>
+
+<p>El script <code>04_autenticacion_tls.sh</code> abre conexiones TCP a <code>postgres</code> como
+<code>gerente_db</code>, <code>ti_db</code> y <code>auditor_db</code>, con las contraseñas que el Compose ya entregó
+al contenedor. Exige <code>sslmode=verify-full</code>, usa el certificado local como raíz de
+confianza y comprueba <code>session_user</code>, <code>current_user</code> y <code>pg_stat_ssl</code>.
+Además hace un único intento con una contraseña incorrecta y distingue un rechazo
+de autenticación de un fallo de red o certificado.</p>
+
+<p>No publica puertos en el anfitrión y no simula otra computadora. Es una prueba TCP
+local dentro de Docker. <code>verify-full</code> comprueba confianza y coincidencia del nombre
+del servidor; el certificado sigue siendo autofirmado de laboratorio.</p>
+
+<h2>Defensa breve</h2>
+
+<p>«No basta con tener tres usuarios. Comprobamos qué objetos puede usar cada uno,
+probamos acciones con esa identidad y separamos esa autorización del login real.
+El gerente recibe reportes, TI puede registrar operaciones de soporte y el auditor
+consulta evidencia. Ninguno de esos tres usuarios puede borrar la auditoría.»</p>
+
+<p>La última frase quedó comprobada para las operaciones ensayadas en E03, además
+de la matriz efectiva E02. E04 comprobó las contraseñas y TLS en conexiones nuevas.
+Esto no equivale a probar toda operación posible ni a impedir acciones de un
+superusuario o del administrador del anfitrión.</p>
+
+<p>Fuentes: <a href="https://www.postgresql.org/docs/16/ddl-priv.html">privilegios</a>,
+<a href="https://www.postgresql.org/docs/16/sql-set-role.html">SET ROLE</a>,
+<a href="https://www.postgresql.org/docs/16/functions-info.html">funciones de información</a>,
+<a href="https://www.postgresql.org/docs/16/libpq-ssl.html">SSL</a>.</p>
+</article><article id="seccion-9"><h1>Matriz de cinco riesgos — NutriAnimales S.A.</h1>
+
+<p>Responsable de elaboración y seguimiento: integrante E. Fecha: 16/11/2026.
+Alcance: datos ficticios de clientes, ventas, inventario y producción; PostgreSQL,
+n8n, credenciales, auditoría y continuidad del laboratorio del grupo.</p>
+
+<p>Probabilidad e impacto se valoran de <strong>1 a 5</strong>; riesgo = <strong>P × I</strong>.
+Según los intervalos de la guía: 1–8 bajo, 9–14 medio, 15–19 alto, 20–25 crítico.
+No se etiqueta todo como «alto». Las valoraciones son estimaciones académicas,
+no estadísticas de una empresa real. C: confidencialidad; I: integridad;
+D: disponibilidad.</p>
+
+<p>El riesgo inicial supone ausencia de los controles propuestos. El residual es una
+estimación condicionada a que esos controles operen; no debe presentarse como
+riesgo residual medido solo por estar escrito en un YAML.</p>
+
+<table>
+<thead>
+<tr>
+  <th>ID y amenaza</th>
+  <th>Activo / consecuencia</th>
+  <th>CIA</th>
+  <th style="text-align:right;">P</th>
+  <th style="text-align:right;">I</th>
+  <th>Inicial</th>
+  <th>Controles y vínculo con el proyecto</th>
+  <th>Residual estimado</th>
+  <th>Responsable / respuesta</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>ER1. Acceso no autorizado a PostgreSQL</td>
+  <td>Clientes, ventas y cuentas; lectura o cambios desde una identidad indebida.</td>
+  <td>C/I</td>
+  <td style="text-align:right;">3</td>
+  <td style="text-align:right;">5</td>
+  <td>15 — alto</td>
+  <td>Puerto 5432 sin publicación; HBA con TLS/SCRAM; cuentas separadas y mínimo privilegio; revisión de sesiones H4.</td>
+  <td>2×5=10 — medio, si autenticación y ACL se verifican.</td>
+  <td>A/B/E; identificar sesión, revocar credencial y revisar permisos.</td>
+</tr>
+<tr>
+  <td>ER2. Alteración o borrado de datos sin trazabilidad</td>
+  <td>Productos, lotes, clientes y ventas; decisiones incorrectas o pérdida de evidencia.</td>
+  <td>I</td>
+  <td style="text-align:right;">3</td>
+  <td style="text-align:right;">5</td>
+  <td>15 — alto</td>
+  <td>Cuatro triggers por fila y auditoría por sentencia; funciones con propietario dedicado; denegación de DELETE de auditoría; seguimiento D6.</td>
+  <td>2×5=10 — medio: un superusuario sigue pudiendo alterar el sistema.</td>
+  <td>B/D/E; preservar registros, identificar operación/usuario y recuperar desde una copia verificada si corresponde.</td>
+</tr>
+<tr>
+  <td>ER3. Exposición de contraseñas, tokens o claves privadas</td>
+  <td>Cuentas PostgreSQL, Telegram/Groq, cifrado n8n y TLS; suplantación o acceso indebido.</td>
+  <td>C/I</td>
+  <td style="text-align:right;">4</td>
+  <td style="text-align:right;">5</td>
+  <td>20 — crítico</td>
+  <td>Generación aleatoria; <code>.env</code> fuera de Git; credenciales n8n y custodia privada; permisos del sistema; revocación y renovación tras exposición.</td>
+  <td>2×5=10 — medio: el historial Git, copias, administradores y capturas requieren atención.</td>
+  <td>E/A/D; revocar el secreto real, actualizar consumidor y probar recuperación.</td>
+</tr>
+<tr>
+  <td>ER4. Degradación de TLS o configuración de autenticación</td>
+  <td>Canal de datos y servicios; exposición del tráfico o pérdida de conexión del monitoreo.</td>
+  <td>C/I/D</td>
+  <td style="text-align:right;">2</td>
+  <td style="text-align:right;">5</td>
+  <td>10 — medio</td>
+  <td><code>ssl=on</code>, reglas de rechazo sin TLS, baseline, clientes con verificación del certificado; alertas H2/H5 y supervisión de disponibilidad.</td>
+  <td>1×5=5 — bajo solo si se detectan tanto el cambio como la pérdida del canal de monitoreo.</td>
+  <td>A/C/E; aislar cambio, restaurar configuración aprobada y verificar conexión/certificado.</td>
+</tr>
+<tr>
+  <td>ER5. Lectura masiva mediante una cuenta legítima</td>
+  <td>Datos de clientes/ventas y recursos de la base; extracción o sobrecarga mediante SELECT permitido.</td>
+  <td>C/D</td>
+  <td style="text-align:right;">3</td>
+  <td style="text-align:right;">5</td>
+  <td>15 — alto</td>
+  <td>Reportes agregados del gerente; catálogo acotado del bot; límites/timeout del agente; revisión de consultas y D7.</td>
+  <td>2×5=10 — medio: el agente conserva SELECT directo en tablas empresariales.</td>
+  <td>C/D/B/E; revisar identidad y consulta, limitar acceso/vistas y preservar evidencia sin divulgar datos.</td>
+</tr>
+</tbody>
+</table>
+
+<h2>Evidencia y estado de los controles</h2>
+
+<table>
+<thead>
+<tr>
+  <th>Riesgo</th>
+  <th>Revisado en el código de A/B</th>
+  <th>Observado en la PC de E</th>
+  <th>Evidencia adicional del grupo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>ER1</td>
+  <td>Compose sin 5432 publicado; HBA <code>hostssl ... scram-sha-256</code>; tres grupos/cuentas.</td>
+  <td>E01/E02 y membresías correctas; E03 obtuvo los rechazos previstos; E04 autenticó tres cuentas y rechazó una clave incorrecta.</td>
+  <td>H4 y despliegue final a cargo de A/C.</td>
+</tr>
+<tr>
+  <td>ER2</td>
+  <td><code>04-audit.sqb</code> define cuatro triggers por fila y ocho por sentencia; ACL protege la auditoría.</td>
+  <td>E01 confirmó cuatro triggers por fila habilitados; E02/E03 comprobaron la protección de auditoría en las operaciones ensayadas.</td>
+  <td>B/D aportan UPDATE/DELETE empresarial, registro y detección D6.</td>
+</tr>
+<tr>
+  <td>ER3</td>
+  <td><code>.gitignore</code> excluye <code>.env</code> y claves actuales; configuración separa contraseñas de cuentas y clave n8n.</td>
+  <td>E00 confirma <code>.env</code> ignorado; el archivo se generó sin imprimir valores.</td>
+  <td>Confirmar custodia/permisos del despliegue del grupo y secuencia real de revocación Groq de D.</td>
+</tr>
+<tr>
+  <td>ER4</td>
+  <td>TLS, HBA y baseline están definidos.</td>
+  <td>E01 mostró TLS/SCRAM activos y HBA sin errores; E04 verificó tres logins con TLS 1.3 y <code>verify-full</code>.</td>
+  <td>C demuestra H2/H5 y A confirma el canal del despliegue final.</td>
+</tr>
+<tr>
+  <td>ER5</td>
+  <td>Agente con SELECT y timeout; gerente limitado a tres vistas agregadas.</td>
+  <td>E02 confirma acceso a reporte y separación respecto a auditoría.</td>
+  <td>C/D demuestran catálogo del bot y alerta D7 con consulta real.</td>
+</tr>
+</tbody>
+</table>
+
+<h2>Prioridad y tratamiento</h2>
+
+<ol>
+<li>Cerrar ER3 primero: un token o clave expuesto invalida confiar únicamente en el
+<code>.gitignore</code>. Una clave conocida debe reemplazarse y su consumidor actualizarse.</li>
+<li>Conservar los rechazos reales E03/E04 de ER1/ER2 y reunir las pruebas del DBA
+sobre modificaciones empresariales y auditoría.</li>
+<li>Verificar ER4/ER5 con las evidencias de C/D en la versión integrada del grupo.</li>
+<li>Revisar estas valoraciones cuando cambien permisos, servicios, secretos o ramas.</li>
+</ol>
+
+<p>Los volúmenes locales sobreviven a recrear un contenedor, pero están en la misma
+máquina. Para continuidad hacen falta una copia externa privada y una restauración
+probada. Insertar una fila en la tabla <code>backups</code> no acredita ninguna de esas acciones.</p>
+
+<p>Fuentes del control: Compose y SQL de A/B en <code>8ea8c12500aa7375ea11f57c406d7b11211c4190</code>;
+requisitos y umbrales de la guía del curso; resultados reales en
+<a href="#seccion-1">RESULTADOS_E.md</a>.</p>
+</article><article id="seccion-10"><h1>Validación y límites</h1>
+
+<h2>Evidencia real del integrante E</h2>
+
+<p>Las capturas aportadas el 16/11/2026 acreditan el arranque en Docker Desktop,
+PostgreSQL <strong>16.14</strong>, los seis grupos/cuentas seleccionados y la matriz efectiva
+de cuatro privilegios por cuenta. Se incluyen sin alterar en <code>parte-e/evidencias</code>.
+La preparación de TLS del complemento Windows ya se utilizó en ese arranque.</p>
+
+<p>El integrante ejecutó además E03 y E04 desde PowerShell. E03 obtuvo cuatro
+denegaciones esperadas y terminó con ROLLBACK. E04 autenticó las tres cuentas con
+TLS 1.3 y <code>verify-full</code>, y verificó rechazo de una clave incorrecta. El diagnóstico
+completo confirmó las tres membresías, once objetos seleccionados, cuatro triggers
+habilitados y los parámetros/reglas activos. El registro de consola original está
+incluido como <code>evidencias/Evidencias_Parte_E.txt</code>.</p>
+
+<p>Los SHA-256 de los tres archivos indicados en ese registro se compararon con sus
+fuentes normalizadas a LF: los tres coinciden. No se fabricaron salidas ni se
+incluyeron registros de otro entorno como si fueran los del integrante.</p>
+
+<h2>Comprobaciones al preparar el código</h2>
+
+<ul>
+<li>Sintaxis de los tres SQL comprobada con parser PostgreSQL.</li>
+<li>E03 ejecutado con el motor PostgreSQL <strong>16.2</strong> en modo monousuario sobre un
+esquema compatible previamente inicializado: cuatro denegaciones de privilegios,
+sin errores no controlados, y ninguna fila de ensayo persistida tras ROLLBACK.</li>
+<li>Sintaxis Bash de autenticación y preparación comprobada con <code>bash -n</code>.</li>
+<li>Combinación de ambos YAML validada con Docker Compose <strong>2.39.1</strong>, utilizando
+valores ficticios exclusivamente en la validación. Se comprobó la sustitución
+de los tres montajes y la conservación de los demás archivos/volúmenes.</li>
+<li>La normalización CRLF del preparador conserva el contenido lógico de los siete
+archivos de inicialización de A/B.</li>
+<li>El archivo ZIP se verifica antes de entregarse; contiene código, documentos,
+seis capturas y el texto de evidencia aportado. No incluye <code>.env</code> ni claves privadas.</li>
+</ul>
+
+<p>La comprobación preparatoria del motor 16.2 es auxiliar. La evidencia del recorrido
+PowerShell, psql, permisos y autenticación del proyecto procede de las ejecuciones
+reales del integrante E en Windows con PostgreSQL 16.14. Esa evidencia, no el ensayo
+auxiliar, fundamenta los resultados del informe.</p>
+
+<h2>Interpretación de resultados</h2>
+
+<ul>
+<li>E03 debe terminar sin <code>ERROR</code> no controlado y mostrar cuatro <code>PASS</code> por denegación,
+además del <code>ROLLBACK</code>. No basta con ver solo un mensaje de inicio o un PASS.</li>
+<li>E04 debe mostrar los tres logins con su identidad y protocolo TLS y un rechazo
+específico de contraseña incorrecta. Un fallo de red/certificado no cuenta.</li>
+<li>E01/E02 son consultas: su ejecución sin error no significa automáticamente que
+todos los permisos coincidan con el diseño; se comparan sus filas con la matriz.</li>
+<li>El ejecutor conserva stdout/stderr y se detiene si Docker/Bash/psql devuelve
+código distinto de cero. Revisar el registro, sin cambiarlo para aparentar éxito.</li>
+</ul>
+
+<p>Los resultados de C/D, los servicios n8n/Nginx y la revocación Groq se incorporan
+desde las ejecuciones que aporten sus responsables, con versión y entorno propios.</p>
+</article><article id="seccion-11"><h1>Soporte para comprobar la parte E desde Windows</h1>
+
+<p>Grupo 3 · NutriAnimales S.A. · Preparado el 16 de noviembre de 2026.</p>
+
+<p>Base revisada: <code>feature/integrantes-A_B</code>, commit <code>8ea8c12500aa7375ea11f57c406d7b11211c4190</code>.
+Rama de trabajo de E: <code>feature/integrante5-riesgos-rbac</code>.</p>
+
+<h2>Qué agrega y por qué</h2>
+
+<p>El <code>compose.yaml</code> del equipo espera preparar certificados y permisos desde Linux.
+Este complemento conserva su PostgreSQL 16.14, configuración TLS, roles, datos,
+triggers y permisos; adapta la preparación a Docker Desktop desde PowerShell.
+No necesita instalar una distribución Ubuntu en WSL.</p>
+
+<p>Se agregan únicamente <code>compose.parte-e.windows.yaml</code> y esta carpeta <code>parte-e/windows</code>.
+No se reemplaza ningún archivo del equipo. El <code>.env</code> local existente se conserva.
+No se incluyen contraseñas, certificados privados ni datos de PostgreSQL en este paquete.</p>
+
+<h2>Paso a paso</h2>
+
+<p>Ejecutar desde la raíz del clon, donde está <code>compose.yaml</code>.
+El <code>.env</code> debe contener las variables requeridas por el Compose del equipo.</p>
+
+<h3>1. Revisar la combinación sin imprimir secretos</h3>
+
+<div class="codehilite">
+<pre><span></span><code><span class="n">docker</span> <span class="n">compose</span> <span class="n">-p</span> <span class="n">nutrianimales-e</span> <span class="o">-f</span> <span class="n">compose</span><span class="p">.</span><span class="n">yaml</span> <span class="o">-f</span> <span class="n">compose</span><span class="p">.</span><span class="n">parte-e</span><span class="p">.</span><span class="n">windows</span><span class="p">.</span><span class="n">yaml</span> <span class="n">config</span> <span class="p">-</span><span class="n">-quiet</span>
+</code></pre>
+</div>
+
+<p>Si termina sin errores y sin salida, la configuración se pudo resolver.
+Esto no comprueba todavía que PostgreSQL arranque ni que sus permisos sean correctos.</p>
+
+<table>
+<thead>
+<tr>
+  <th>Fragmento</th>
+  <th>Qué hace</th>
+  <th>Por qué se usa</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>docker compose</code></td>
+  <td>Gestiona servicios definidos en YAML.</td>
+  <td>Reutiliza el proyecto del equipo.</td>
+</tr>
+<tr>
+  <td><code>-p nutrianimales-e</code></td>
+  <td>Da un nombre propio a la instancia local.</td>
+  <td>Separa su red y volúmenes de otras instancias Compose.</td>
+</tr>
+<tr>
+  <td><code>-f compose.yaml</code></td>
+  <td>Lee la definición original primero.</td>
+  <td>Mantiene el SQL y las opciones del equipo.</td>
+</tr>
+<tr>
+  <td><code>-f compose.parte-e.windows.yaml</code></td>
+  <td>Aplica el complemento después.</td>
+  <td>Sustituye los montajes de TLS, init y logs por volúmenes Linux.</td>
+</tr>
+<tr>
+  <td><code>config --quiet</code></td>
+  <td>Valida sin imprimir el modelo con sus variables resueltas.</td>
+  <td>Evita mostrar contraseñas en la terminal o capturas.</td>
+</tr>
+</tbody>
+</table>
+
+<h3>2. Iniciar solamente la base para las pruebas de E</h3>
+
+<div class="codehilite">
+<pre><span></span><code><span class="n">docker</span> <span class="n">compose</span> <span class="n">-p</span> <span class="n">nutrianimales-e</span> <span class="o">-f</span> <span class="n">compose</span><span class="p">.</span><span class="n">yaml</span> <span class="o">-f</span> <span class="n">compose</span><span class="p">.</span><span class="n">parte-e</span><span class="p">.</span><span class="n">windows</span><span class="p">.</span><span class="n">yaml</span> <span class="n">up</span> <span class="n">-d</span> <span class="p">-</span><span class="n">-wait</span> <span class="p">-</span><span class="n">-wait-timeout</span> <span class="n">180</span> <span class="n">postgres</span>
+</code></pre>
+</div>
+
+<p><code>up</code> crea o inicia los servicios; <code>-d</code> los deja en segundo plano; <code>--wait</code> espera el
+estado saludable; <code>--wait-timeout 180</code> limita esa espera a tres minutos.
+El argumento <code>postgres</code> inicia únicamente esa base y su dependencia <code>preparar-e</code>.
+La preparación usa root para establecer propietarios, termina y luego PostgreSQL
+se ejecuta mediante el entrypoint oficial que cambia al usuario postgres.</p>
+
+<p>No inicia n8n, Nginx, pgAdmin ni Filebeat. Es una instancia para comprobar roles,
+riesgos y secretos de E, no una demostración completa de las alertas del grupo.
+No se publica el puerto 5432 en Windows.</p>
+
+<h3>3. Revisar estado</h3>
+
+<div class="codehilite">
+<pre><span></span><code><span class="n">docker</span> <span class="n">compose</span> <span class="n">-p</span> <span class="n">nutrianimales-e</span> <span class="o">-f</span> <span class="n">compose</span><span class="p">.</span><span class="n">yaml</span> <span class="o">-f</span> <span class="n">compose</span><span class="p">.</span><span class="n">parte-e</span><span class="p">.</span><span class="n">windows</span><span class="p">.</span><span class="n">yaml</span> <span class="nb">ps </span><span class="n">-a</span>
+</code></pre>
+</div>
+
+<p><code>ps -a</code> muestra también el contenedor de preparación ya terminado.
+Lo esperado, cuando se ejecute realmente, es <code>preparar-e</code> con salida 0 y
+<code>postgres</code> en ejecución y saludable. Este documento no afirma que ya haya sucedido.</p>
+
+<h3>4. Consultar versión y conexión administrativa local</h3>
+
+<div class="codehilite">
+<pre><span></span><code><span class="n">docker</span> <span class="n">compose</span> <span class="n">-p</span> <span class="n">nutrianimales-e</span> <span class="o">-f</span> <span class="n">compose</span><span class="p">.</span><span class="n">yaml</span> <span class="o">-f</span> <span class="n">compose</span><span class="p">.</span><span class="n">parte-e</span><span class="p">.</span><span class="n">windows</span><span class="p">.</span><span class="n">yaml</span> <span class="n">exec</span> <span class="n">-T</span> <span class="n">postgres</span> <span class="n">psql</span> <span class="n">-X</span> <span class="n">-U</span> <span class="n">postgres</span> <span class="n">-d</span> <span class="n">nutrianimales</span> <span class="n">-v</span> <span class="n">ON_ERROR_STOP</span><span class="p">=</span><span class="n">1</span> <span class="n">-c</span> <span class="s2">"SELECT current_database(), current_user, version();"</span>
+</code></pre>
+</div>
+
+<p><code>exec</code> ejecuta un comando en el servicio iniciado; <code>-T</code> evita asignar terminal;
+<code>psql</code> es el cliente de PostgreSQL; <code>-X</code> ignora configuraciones personales;
+<code>-U</code> elige usuario y <code>-d</code> base; <code>ON_ERROR_STOP=1</code> detiene el cliente si falla el SQL;
+<code>-c</code> ejecuta la consulta escrita. Solo muestra identidad y versión.
+Esta consulta usa el socket local administrativo: no prueba contraseña ni TLS.
+Las pruebas de autorización RBAC y login deben registrarse por separado.</p>
+
+<h3>Si falla el arranque</h3>
+
+<div class="codehilite">
+<pre><span></span><code><span class="n">docker</span> <span class="n">compose</span> <span class="n">-p</span> <span class="n">nutrianimales-e</span> <span class="o">-f</span> <span class="n">compose</span><span class="p">.</span><span class="n">yaml</span> <span class="o">-f</span> <span class="n">compose</span><span class="p">.</span><span class="n">parte-e</span><span class="p">.</span><span class="n">windows</span><span class="p">.</span><span class="n">yaml</span> <span class="n">logs</span> <span class="p">-</span><span class="n">-tail</span> <span class="n">60</span> <span class="n">preparar-e</span> <span class="n">postgres</span>
+</code></pre>
+</div>
+
+<p><code>logs</code> consulta la salida de ambos servicios y <code>--tail 60</code> limita su extensión.
+No ejecutar comandos que impriman <code>.env</code>, claves privadas o el modelo completo de Compose.
+Los registros internos de consultas SQL pueden contener información sensible:
+revisar cualquier archivo antes de adjuntarlo o subirlo al repositorio.</p>
+
+<h2>Explicación del código agregado</h2>
+
+<p>Ambos archivos de código están comentados por instrucción o bloque.</p>
+
+<table>
+<thead>
+<tr>
+  <th>Código</th>
+  <th>Función y motivo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>network_mode: none</code></td>
+  <td>La preparación funciona sin Internet y solo procesa archivos locales.</td>
+</tr>
+<tr>
+  <td><code>entrypoint: bash -euo pipefail -c</code></td>
+  <td>Usa Bash; detiene errores, variables inexistentes y fallos dentro de tuberías.</td>
+</tr>
+<tr>
+  <td><code>sed 's/\r$$//'</code> en YAML</td>
+  <td>Elimina CRLF al ejecutar el script; <code>$$</code> entrega un <code>$</code> literal después de la interpolación Compose.</td>
+</tr>
+<tr>
+  <td>Montajes <code>/entrada/sql</code> y <code>/soporte</code> con <code>:ro</code></td>
+  <td>Permiten leer los originales sin modificarlos desde el contenedor de preparación.</td>
+</tr>
+<tr>
+  <td>Volúmenes <code>e_pg_init</code>, <code>e_pg_tls</code>, <code>e_pg_logs</code></td>
+  <td>Ofrecen permisos Linux reales dentro de Docker Desktop. El nombre de proyecto evita reutilizar volúmenes de otra instancia.</td>
+</tr>
+<tr>
+  <td><code>depends_on</code> con <code>service_completed_successfully</code></td>
+  <td>La base espera que la preparación termine correctamente.</td>
+</tr>
+<tr>
+  <td><code>pg_isready -h 127.0.0.1</code></td>
+  <td>Espera el servidor TCP final; el servidor temporal de initdb solo abre socket local. Es disponibilidad, no prueba de autorización.</td>
+</tr>
+<tr>
+  <td><code>umask 077</code></td>
+  <td>Crea inicialmente archivos privados; solo se abren de forma explícita los SQL y el certificado público.</td>
+</tr>
+<tr>
+  <td><code>command -v</code>, <code>id</code>, <code>test -f</code></td>
+  <td>Comprueban herramientas, cuenta del sistema y archivos requeridos antes de preparar la base.</td>
+</tr>
+<tr>
+  <td><code>install -d -m 755</code></td>
+  <td>Prepara directorios accesibles por PostgreSQL.</td>
+</tr>
+<tr>
+  <td>Bucle <code>.sqb</code> con <code>sed</code>, <code>basename</code> y <code>chmod 644</code></td>
+  <td>Copia el SQL con finales LF; no cambia su contenido lógico ni su extensión.</td>
+</tr>
+<tr>
+  <td><code>printf</code> del shebang y <code>chmod 755</code></td>
+  <td>Hace ejecutable la copia del inicializador con el intérprete correcto.</td>
+</tr>
+<tr>
+  <td>Comprobación de certificado existente</td>
+  <td>Evita cambiar su identidad en cada reinicio y detecta un volumen TLS incompleto o certificado vencido.</td>
+</tr>
+<tr>
+  <td><code>openssl req -x509 -nodes -newkey rsa:3072 -sha256 -days 365</code></td>
+  <td>Genera un certificado local autofirmado con clave RSA 3072 y firma SHA-256, como el enfoque del equipo. La clave sin passphrase permite arranque desatendido y queda protegida con permisos Linux.</td>
+</tr>
+<tr>
+  <td><code>-keyout</code>, <code>-out</code>, <code>-subj</code>, <code>-addext</code></td>
+  <td>Definen archivos de clave/certificado, identidad y nombres SAN válidos para esta instancia. No sustituyen una CA de producción.</td>
+</tr>
+<tr>
+  <td><code>chown postgres:postgres</code> y <code>chmod 600</code></td>
+  <td>Asignan la clave al usuario real de la imagen y permiten leerla solo a su propietario.</td>
+</tr>
+<tr>
+  <td><code>chmod 644</code> del certificado</td>
+  <td>El certificado público puede compartirse para validar la conexión; su clave privada queda restringida.</td>
+</tr>
+<tr>
+  <td><code>bash -n</code></td>
+  <td>Comprueba sintaxis sin ejecutar la inicialización SQL.</td>
+</tr>
+</tbody>
+</table>
+
+<h2>Límites y conservación de datos</h2>
+
+<p>El SQL de inicialización se ejecuta solo al crear una base vacía, como en la imagen
+oficial. Cambiar el SQL después no migra una base existente. Este complemento no
+borra volúmenes ni migra datos. Detener contenedores conserva el estado almacenado.
+No usar <code>down -v</code> como paso rutinario, porque elimina los volúmenes de esta instancia.
+Las pruebas de este entorno local deben identificarse como ejecutadas en la PC de E.</p>
+
+<h2>Validación al preparar este paquete</h2>
+
+<p>Se revisó el código actual de A/B. Se comprobaron la sintaxis Bash, la combinación
+real de Compose 2.39.1 con variables ficticias, la sustitución de montajes y la
+equivalencia del SQL copiado con sus finales de línea normalizados.
+El arranque real se ejecutó después en la computadora del integrante E y quedó
+saludable. Las pruebas PostgreSQL 16.14 de roles, permisos, operaciones y login TLS
+también se verificaron con sus salidas. Ver <a href="#seccion-1">RESULTADOS_E.md</a>.</p>
+
+<h2>Referencias oficiales</h2>
+
+<ul>
+<li><a href="https://docs.docker.com/reference/compose-file/merge/">Combinar archivos Compose</a></li>
+<li><a href="https://docs.docker.com/engine/storage/volumes/">Volúmenes Docker</a></li>
+<li><a href="https://www.postgresql.org/docs/16/ssl-tcp.html">PostgreSQL 16: SSL y permisos de clave privada</a></li>
+<li><a href="https://hub.docker.com/_/postgres">Imagen oficial PostgreSQL</a></li>
+<li><a href="https://github.com/docker-library/postgres/blob/master/docker-entrypoint.sh">Entrypoint oficial</a></li>
+</ul>
+</article></main></body></html>

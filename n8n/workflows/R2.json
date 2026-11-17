@@ -1,11 +1,9 @@
 {
-  "name": "Nutri R2 — Conexiones activas",
+  "id": "nutriR2alerta00",
+  "name": "Nutri R2 — Saturación de conexiones activas",
+  "active": true,
   "nodes": [
     {
-      "id": "706f72d5-9567-5165-80bd-37728d69ba44",
-      "name": "Cada 30 segundos",
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.2,
       "parameters": {
         "rule": {
           "interval": [
@@ -16,120 +14,197 @@
           ]
         }
       },
+      "id": "cada-30-segundos",
+      "name": "Cada 30 segundos",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
       "position": [
         0,
         0
       ],
-      "notes": "Agenda de la regla R2. Sondeo periódico, no detección instantánea garantizada.",
+      "notes": "Sondeo periódico de la regla R2.",
       "notesInFlow": true
     },
     {
-      "id": "aeae0485-6434-5f0f-a245-bfbb493c5c1f",
+      "parameters": {},
+      "id": "prueba-manual",
       "name": "Prueba manual",
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
-      "parameters": {},
       "position": [
         0,
-        240
+        200
       ],
-      "notes": "Permite ejecutar esta misma regla desde el editor durante QA.",
+      "notes": "Ejecutar la regla a mano desde el editor.",
       "notesInFlow": true
     },
     {
-      "id": "46beba81-731a-564e-aa9d-e0594842a1bd",
-      "name": "Detectar R2",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
       "parameters": {
-        "method": "POST",
-        "url": "http://monitor:8000/checks/R2",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "options": {
-          "timeout": 120000
-        }
+        "operation": "executeQuery",
+        "query": "WITH a AS (\n  SELECT count(*) AS activas, string_agg(DISTINCT usename, ', ') AS usuarios\n  FROM pg_stat_activity\n  WHERE backend_type = 'client backend' AND state = 'active' AND pid <> pg_backend_pid()\n)\nSELECT 'R2-' || to_char(date_bin('5 minutes', now(), timestamptz '2000-01-01'), 'YYYYMMDDHH24MI') AS huella,\n       activas, usuarios,\n       format(E'Conexiones activas: %s (umbral: 10)\\nUsuarios: %s\\nmax_connections: %s', activas, usuarios, current_setting('max_connections')) AS texto\nFROM a\nWHERE activas > 10;",
+        "options": {}
       },
+      "id": "detectar",
+      "name": "Detectar R2",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
       "position": [
-        260,
-        0
+        240,
+        100
       ],
-      "notes": "Conexiones activas. Fuente: pg_stat_activity. Condición: Más de 10 clientes activos. Devuelve evidencia real o un error de fuente no disponible.",
-      "notesInFlow": true,
       "credentials": {
-        "httpHeaderAuth": {
-          "id": "REEMPLAZAR_AL_IMPORTAR",
-          "name": "Nutri monitor"
+        "postgres": {
+          "id": "__CRED_MONITOR__",
+          "name": "Nutri Postgres monitor_db"
         }
       },
-      "retryOnFail": true,
-      "maxTries": 3,
-      "waitBetweenTries": 2000
+      "notes": "Fuente: pg_stat_activity (state = active > 10)",
+      "notesInFlow": true
     },
     {
-      "id": "e96865c4-d51e-5aa4-8884-d003cf263483",
-      "name": "Hay hallazgo",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.2,
       "parameters": {
         "conditions": {
           "options": {
             "caseSensitive": true,
             "leftValue": "",
-            "typeValidation": "strict",
+            "typeValidation": "loose",
             "version": 2
           },
           "conditions": [
             {
-              "id": "R2",
-              "leftValue": "={{ $json.detected }}",
-              "rightValue": true,
+              "id": "c1",
+              "leftValue": "={{ $json.huella }}",
+              "rightValue": "",
               "operator": {
-                "type": "boolean",
-                "operation": "true",
+                "type": "string",
+                "operation": "notEmpty",
                 "singleValue": true
               }
             }
           ],
           "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "-hay-hallazgo-",
+      "name": "¿Hay hallazgo?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        480,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO alertas_auditoria (tipo, alerta, mensaje, detalles, severidad, huella)\nVALUES ('rendimiento', 'R2', 'Saturación de conexiones activas', $1::jsonb, 'advertencia', $2)\nON CONFLICT (huella) DO UPDATE SET intentos = alertas_auditoria.intentos\n  WHERE alertas_auditoria.estado = 'pendiente'\nRETURNING id::text AS id;",
+        "options": {
+          "queryReplacement": "={{ [ JSON.stringify($json), $json.huella ] }}"
         }
       },
+      "id": "registrar",
+      "name": "Registrar alerta R2",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
       "position": [
-        520,
-        0
+        720,
+        100
       ],
-      "notes": "Solo la rama verdadera solicita notificación. Sin hallazgo no se envía Telegram.",
+      "credentials": {
+        "postgres": {
+          "id": "__CRED_MONITOR__",
+          "name": "Nutri Postgres monitor_db"
+        }
+      },
+      "notes": "La huella UNIQUE evita repetir un hallazgo ya enviado; si quedó pendiente (falló Telegram) se reintenta.",
       "notesInFlow": true
     },
     {
-      "id": "a625dafc-9658-5c4a-8b8f-0b35f1a3e18d",
-      "name": "Notificar R2",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
       "parameters": {
-        "method": "POST",
-        "url": "=http://monitor:8000/notify/{{ $json.event_id }}",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "options": {
-          "timeout": 120000
-        }
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
       },
+      "id": "-alerta-nueva-",
+      "name": "¿Alerta nueva?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
       "position": [
-        800,
-        0
-      ],
-      "notes": "Invoca una operación fija del monitor. La credencial se importa cifrada en n8n, nunca en este JSON. Reintenta fallos transitorios; la bandeja evita duplicados normales.",
-      "notesInFlow": true,
-      "credentials": {
-        "httpHeaderAuth": {
-          "id": "REEMPLAZAR_AL_IMPORTAR",
-          "name": "Nutri monitor"
+        960,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "__TELEGRAM_CHAT_ID__",
+        "text": "=<b>ALERTA ADVERTENCIA - NutriAnimales S.A. | Lead University BCD 9220</b>\n<b>Alerta:</b> R2 — Saturación de conexiones activas\n<b>Fecha:</b> {{ $now.setZone('America/Costa_Rica').toFormat('yyyy-MM-dd HH:mm:ss') }}\n{{ $('Detectar R2').item.json.texto.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }}\n<b>Severidad:</b> ADVERTENCIA\n<b>Acción:</b> Revisar pg_stat_activity y terminar sesiones abusivas con pg_terminate_backend(pid).\n<i>Registro: alertas_auditoria {{ $('Registrar alerta R2').item.json.id }}</i>",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
         }
       },
-      "retryOnFail": true,
-      "maxTries": 3,
-      "waitBetweenTries": 2000
+      "id": "enviar-telegram",
+      "name": "Enviar alerta R2",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1200,
+        100
+      ],
+      "webhookId": "nutri-R2-telegram",
+      "credentials": {
+        "telegramApi": {
+          "id": "__CRED_TELEGRAM__",
+          "name": "Nutri Telegram bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE alertas_auditoria\nSET estado = 'enviada', enviada_en = now(), intentos = intentos + 1\nWHERE id = $1::uuid;",
+        "options": {
+          "queryReplacement": "={{ [ $('Registrar alerta R2').item.json.id ] }}"
+        }
+      },
+      "id": "marcar-enviada",
+      "name": "Marcar enviada R2",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1440,
+        100
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "__CRED_MONITOR__",
+          "name": "Nutri Postgres monitor_db"
+        }
+      },
+      "notes": "Deja constancia de la entrega en alertas_auditoria.",
+      "notesInFlow": true
     }
   ],
   "connections": {
@@ -159,28 +234,62 @@
       "main": [
         [
           {
-            "node": "Hay hallazgo",
+            "node": "¿Hay hallazgo?",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Hay hallazgo": {
+    "Enviar alerta R2": {
       "main": [
         [
           {
-            "node": "Notificar R2",
+            "node": "Marcar enviada R2",
             "type": "main",
             "index": 0
           }
-        ],
-        []
+        ]
+      ]
+    },
+    "¿Hay hallazgo?": {
+      "main": [
+        [
+          {
+            "node": "Registrar alerta R2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registrar alerta R2": {
+      "main": [
+        [
+          {
+            "node": "¿Alerta nueva?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Alerta nueva?": {
+      "main": [
+        [
+          {
+            "node": "Enviar alerta R2",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     }
   },
   "settings": {
     "executionOrder": "v1",
     "timezone": "America/Costa_Rica"
-  }
+  },
+  "pinData": {},
+  "tags": []
 }

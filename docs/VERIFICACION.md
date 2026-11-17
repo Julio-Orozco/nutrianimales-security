@@ -1,24 +1,37 @@
-# Verificación de esta entrega
+# Verificación de A y B
 
-Fecha: 12 de noviembre de 2026. No contiene resultados de una instalación del grupo ni capturas inventadas.
+Fecha de ejecución: 14 de noviembre de 2026. Los resultados son de la instancia Docker de este entorno, no de la computadora de exposición. No se generaron capturas de pantalla.
 
-## Comprobado durante la preparación
+## Resultados ejecutados
 
-- **43 pruebas Python aprobadas**: límites de horario/CIDR, parser SQL, estadísticas acumuladas, autorización API/auditor, bloqueo de inyección antes de consultar BD, pérdida de credencial Groq, fuentes ausentes, crecimiento, permisos efectivos observados y estados de entrega/deduplicación. Dos avisos de dependencias de pruebas (pytest/Starlette-httpx), sin fallos.
-- Compilación de archivos Python sin errores.
-- Compose principal y extensión de logs validados por Docker Compose2.39.1 mediante `config --quiet`.
-- `prepare` ejecutado y repetido sin sobrescribir los secretos. Certificado verificado con OpenSSL contra la CA y nombre postgres. Es material de verificación local excluido del ZIP.
-- Esquema, datos, funciones de auditoría y grants ejecutados sobre **PostgreSQL16.2 real en modo standalone**, sin servidor de red. Se comprobó UPDATE antes/después, atribución al usuario de sesión, conteo de 500 filas por sentencia y denegaciones efectivas. También se invocó security_snapshot con rol monitor_db.
-- Límite de esa prueba SQL: el paquete standalone no incluye pg_stat_statements; se omitió exclusivamente su CREATE EXTENSION en el arnés local, sin eliminarlo del proyecto. No se probó el recolector de métricas contra una extensión activa. Por ausencia de sesión autenticada de red, el arnés restableció explícitamente la identidad postgres en lugar del RESET de sesión usado en el test normal. El CI de integración mantiene el ensayo normal por psql.
-- Etiquetas postgres16.11, Python3.12.12, Nginx1.28.0, pgAdmin9.10, Loki3.5.7 y n8n2.47.4 consultadas en registro; paquetes Python directos contrastados con PyPI. Existir no significa que la imagen se haya arrancado ni que esté libre de vulnerabilidades.
-- Se incluyen 18 JSON n8n estructuralmente comprobados, sin tokens reales y con conexiones de nodos coherentes.
+- Docker Engine 29.6.2 y Compose v5.3.1; `docker compose config --quiet` terminó correctamente.
+- El Compose se recreó sin borrar volúmenes. PostgreSQL, n8n, Nginx, pgAdmin y Filebeat aparecen como procesos en ejecución. pgAdmin funciona detrás de Nginx. En la revisión 2 se identificó la causa del 502 de n8n (falta del privilegio `CREATE` de base para la sentencia `CREATE SCHEMA IF NOT EXISTS` que n8n ejecuta con `monitor_db`) y se corrigió con la cuenta dedicada `n8n_app`; ahora `https://localhost:8443/` devuelve HTTP 200 con la interfaz de n8n.
+- Solo Nginx publica `127.0.0.1:8080` y `127.0.0.1:8443`. pgAdmin no publica 5050 y PostgreSQL no publica 5432.
+- UID efectivos: PostgreSQL 999, n8n 1000, Nginx 1000, pgAdmin 5050 y Filebeat 1000 (grupo `adm` para la lectura opcional de logs).
+- La red bridge creada contiene los cinco servicios y tiene salida (no es `internal`). HBA acepta `samenet` con TLS/SCRAM y rechaza el resto de conexiones host.
+- `.env` tiene modo 600 y Git lo ignora. El archivo existía antes y no fue sobrescrito; sus valores no se muestran. `.env.example` quedó sin contraseñas predeterminadas. La preparación no rota credenciales de una instalación existente; coordinar cualquier rotación con PostgreSQL, pgAdmin y n8n antes de usarla fuera del laboratorio.
+- HTTPS para `localhost` valida con `openssl verify`; SAN incluye `localhost` e `127.0.0.1`. La solicitud local devuelve los cuatro headers exigidos. El certificado es autofirmado; no tiene confianza pública.
+- El navegador integrado rechazó el certificado autofirmado (`ERR_CERT_AUTHORITY_INVALID`), como corresponde antes de importar confianza local; por ello no se guardó una captura de navegador. `curl --cacert` sí validó la cadena y el nombre.
+- pgAdmin abre por `/pgadmin/` a través de HTTPS y redirige al formulario; al seguir la redirección responde 200. No se publica al host.
+- PostgreSQL muestra SSL `on`, cifrado de contraseñas `scram-sha-256` y log de duración mínima 1 s. La conexión de agente_ia pasó `sslmode=verify-full` con TLS 1.3.
+- Baseline: siete parámetros comparados; las siete filas coinciden. Conteos: 3 plantas, 50 productos, 100 materias primas, 500 lotes, 1.500 clientes, 1.500 ventas, 300 controles de calidad y 200 gastos.
+- Catálogo: 14 tablas, 14 PK, 5 FK, índices de auditoría por tabla/usuario/fecha, dos funciones de auditoría y veinte eventos de triggers sobre las cuatro tablas críticas.
+- Inicialización desde cero probada en un contenedor PostgreSQL temporal sin red ni puertos publicados: 14 tablas, 20 triggers y siete parámetros de baseline; el contenedor se retiró automáticamente.
+- agente_ia pudo SELECT sobre los productos y no tiene grants de escritura. INSERT, UPDATE y DELETE se rechazaron efectivamente como transacciones de solo lectura.
+- `db/demo-audit.sql` ejecutó un INSERT/UPDATE/DELETE sobre una fila ficticia, eliminó la fila y dejó tres eventos de auditoría. El evento DELETE conservó `valor_antes` y `valor_nuevo IS NULL`.
+- `SELECT pg_sleep(1.1)` quedó registrado con duración mayor a 1.000 ms y aparece en `pg_stat_statements`.
+- Filebeat funciona sin root y sin errores recientes, pero no se verificó un archivo UFW del host; la salida configurada es consola, no Logstash/Loki.
 
-## Pendiente de ejecutar en su entorno
+Los comandos y salidas resumidas están en `evidencias/RESULTADOS_AB.md`. La matriz de los doce controles está en `docs/CUMPLIMIENTO.md`.
 
-No hay daemon Docker utilizable en el entorno de preparación, por lo que **no se ejecutó el stack completo**, ni se ensayó su arranque, importación/publicación n8n, carga de pgAdmin, permisos efectivos de todas las imágenes, backup/restauración Docker ni cadena Filebeat/Logstash/Loki. Se proporciona un workflow de integración que debe ejecutarse y revisarse en GitHub o localmente.
+## Pendiente
 
-Tampoco se usaron tokens del usuario: faltan la recepción/envío real Telegram, Groq y su revocación, cinco ataques completos, diecisiete capturas, medición de latencia, UFW del Ubuntu anfitrión y carga/rendimiento reales. La lógica y configuración incluidas no sustituyen esas evidencias. El Viewer nativo sigue sujeto a licencia/acuerdo docente.
+- Crear la cuenta propietaria de n8n desde el navegador e importar los flujos (responsabilidad de monitoreo/bot). La interfaz funciona; los flujos, Telegram y Groq no se han probado.
+- Ejecutar la instalación en el equipo de exposición y guardar las capturas propias de los doce controles.
+- Recibir la rúbrica oficial y el PDF/Word actual. No estaban en los archivos disponibles, por lo que `docs/INFORME.md` contiene secciones listas para integrar, no una edición del archivo original.
+- El proyecto no usa Python. Los flujos n8n heredados llaman a un servicio Python que no se usará y deben adaptarse (`docs/FLUJOS_N8N.md`). Logstash/Loki no están incluidos. Alertas, Telegram/Groq, UFW, backups y escenarios no se han probado ni se declaran completos.
+- Medir arranque desde una instalación limpia, con equipo e imágenes especificados.
 
-## Cómo repetir la comprobación ordinaria
+## Repetición básica
 
-Instalar requirements-dev en un entorno virtual y ejecutar pytest como indica COMANDOS. Después levantar el laboratorio real y ejecutar tests/sql-invariants.sql a través de psql. Revisar Actions y corregir cualquier incompatibilidad del entorno antes de la exposición. No usar la existencia de ci.yml como prueba de un CI aprobado.
+Seguir `docs/COMANDOS.md`. No usar `curl -k`, editar salidas, mostrar credenciales, borrar el volumen de PostgreSQL ni tratar la presencia de un contenedor como evidencia de una aplicación funcional.
