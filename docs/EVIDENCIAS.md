@@ -1,44 +1,24 @@
-# Registro de evidencia real
+# Evidencias A y B
 
-Crear una carpeta privada por fecha en `evidencias/`, que Git ignora. No incluir tokens, contraseñas, clave privada TLS ni contenido íntegro de .env. Sí se puede mostrar su nombre/permisos. No editar resultados para simular aprobación.
+Guardar únicamente salidas obtenidas en el laboratorio real. Para cada captura obligatoria A01–A12 ejecutar `sh scripts/capturas-ab.sh A1` … `A12` en WSL y capturar la terminal completa (incluye fecha y hora). No se generaron capturas de pantalla en esta sesión; `evidencias/RESULTADOS_AB.md` contiene comandos y resultados de consola reales, sin secretos. Para una exposición en otra máquina, repetir las pruebas y guardar sus propias capturas.
 
-| Evidencia | Qué capturar | Criterio |
-|---|---|---|
-| E01 | compose ps y puertos | Stack disponible, solo Nginx publicado |
-| E02–E13 | Un punto de hardening por captura | Tabla CUMPLIMIENTO con comando y resultado legibles |
-| E14 | Roles, prueba gerente denegado, agente denegado | Permisos efectivos, no solo nombres |
-| E15 | UPDATE y auditoría antes/después | Usuario real y cuatro triggers activos |
-| R1–R5 | Acción + ejecución n8n + Telegram real | Cada regla con fuente, umbral y hora |
-| H1–H5 | Cambio real + snapshot/log + Telegram | Agente Ubuntu activo en H1; SHA distinto en H2 |
-| D1–D7 | Acción + conteos/consulta + alerta | D6 >50 por sentencia, D7 >1000 filas nuevas |
-| A1–A5 | Comando/mensaje, evento, tiempo y respuesta | No mezclar «detectó» con «bloqueó» |
-| ROT-01–04 | Clave válida, revocada, nueva y recuperación | Códigos reales; ocultar valores |
-| BKP-01 | Archivo, SHA y restore-test.json | Restauración real en base separada |
-| PERF-01 | pgbench + pgBadger | Indicar equipo, tiempo y tipo de carga |
-| LOG-01 | Filebeat/Logstash/Loki sin errores y evento consultable | No basta con ver contenedores «running» |
-| DEMO-01 | Ensayo completo y tiempo de arranque | Declarar si imágenes ya estaban descargadas |
+| Evidencia | Control / demostración | Comando o archivo | Qué acredita |
+|---|---|---|---|
+| A01 | Identidades de contenedores | `docker compose exec -T <servicio> id` | UID/GID del proceso del servicio; comprobar por separado el proceso PostgreSQL. |
+| A02 | Protección de secretos | `stat -c '%a %n' .env`; `git check-ignore -v .env` | Modo 600 e ignorado por Git; no capturar el contenido del archivo. |
+| A03 | Red y comunicación TLS | `docker network inspect <nombre-real>` y conexión `agente_ia` con `sslmode=verify-full` | Red de proyecto y comunicación cifrada/autenticada. |
+| A04 | Puertos publicados | `docker compose ps` | Solo Nginx en loopback; no PostgreSQL ni pgAdmin directamente. |
+| A05 | SCRAM/HBA | Consulta de `password_encryption` y `pg_hba_file_rules` | Autenticación efectiva y reglas activas. |
+| A06 | TLS PostgreSQL | Consulta `pg_stat_ssl` desde la conexión de agente_ia | TLS real de la sesión, no solo el valor de `SHOW ssl`. |
+| A07 | Solo lectura | SELECT y tres operaciones de escritura como agente_ia | SELECT exitoso; INSERT/UPDATE/DELETE denegados y cero grants de escritura. |
+| A08 | Headers web | `curl --cacert ... -I https://localhost:8443/auditoria.html` | HTTPS y los cuatro headers exigidos. |
+| A09 | Certificado web | `openssl verify` y `openssl x509 -ext subjectAltName` | Cadena autofirmada y coincidencia del nombre local. |
+| A10 | Permisos | `stat` de `.env`, claves y directorios de volúmenes | Modos restrictivos y propietario efectivo de los datos. |
+| A11 | Rendimiento y logs | `pg_sleep(1.1)`, logs PostgreSQL y `pg_stat_statements` | Consulta real >1.000 ms registrada y visible en estadísticas. |
+| A12 | Baseline | Consulta join entre `pg_settings_baseline` y `pg_settings` | Siete parámetros y comparación individual. |
+| B01 | Esquema y datos | `\dt`, consulta de conteos | Tablas y cantidades de semilla. |
+| B02 | Triggers/función | Catálogo de `information_schema.triggers` y `\df` | Cuatro tablas, veinte eventos de triggers y funciones existentes. |
+| N01 | n8n detrás de Nginx | `sh scripts/capturas-ab.sh N8N` y navegador en `https://localhost:8443` | `healthz` ok, HTTP 200, esquema `n8n` propiedad de `n8n_app`. |
+| B03 | UPDATE/DELETE | `docker compose exec -T postgres psql ... < db/demo-audit.sql` | Valores antes/después, usuario y DELETE con `valor_nuevo IS NULL`; fila de prueba eliminada. |
 
-## Comandos de evidencia adicionales, explicados
-
-| Comando | Qué hace / para qué / elección |
-|---|---|
-| `ls -l .env` | Muestra modo y propietario sin revelar contenido; debe ser 600 |
-| `ls -ld .runtime/state .runtime/backups .runtime/private` | Revisa directorios privados; -d muestra el directorio, no su contenido |
-| `docker compose exec -T n8n id` | UID efectivo del proceso de diagnóstico dentro de n8n; debe ser1000 |
-| `docker compose exec -T pgadmin id` | UID efectivo de pgAdmin; debe ser5050, no se exige falsamente1000 |
-| `docker compose exec -T postgres psql -U postgres -d nutrianimales -c 'SHOW ssl;'` | Valor efectivo servidor; debe seron. Complementar con una sesión TLS real |
-| `docker compose exec -T postgres psql -U postgres -d nutrianimales -c 'SHOW password_encryption;'` | Cifrado de contraseñas nuevas; complementar con HBA/SCRAM real |
-| `docker compose exec -T postgres psql -U postgres -d nutrianimales -c 'SELECT pid,ssl,version,cipher FROM pg_stat_ssl;'` | Observa cifrado por sesión; los sockets locales no son sesiones TLS |
-| `docker compose exec -T postgres psql -U postgres -d nutrianimales -c '\d auditoria_datos'` | Estructura y campos de la tabla; \d es un metacomando psql, no SQL servidor |
-| `docker compose exec -T postgres psql -U postgres -d nutrianimales -c 'SELECT * FROM pg_stat_statements LIMIT 5;'` | Confirma extensión visible y datos reales; LIMIT acota salida |
-| `docker compose exec -T postgres psql -U postgres -d nutrianimales -c 'SELECT alerta,estado,fecha,enviada_en FROM alertas_auditoria ORDER BY fecha DESC LIMIT 20;'` | Distingue detección y envío; no llamar enviada a dry-run |
-
-Para inspeccionar redes sin inventar el nombre, obtenerlo desde `docker compose ps`/`docker network ls`; Compose aplica el prefijo de proyecto. `docker network ls` enumera redes; `docker network inspect NOMBRE_REAL` muestra su configuración y miembros. El marcador NOMBRE_REAL debe sustituirse por el valor observado, no copiarse literalmente.
-
-## Tabla de resultados para completar
-
-| Regla/ataque | Acción/hora | Detección/hora | Telegram/hora | Duración | Respuesta/reversión | Archivo | Resultado |
-|---|---|---|---|---|---|---|---|
-| PENDIENTE | | | | | | | No ejecutado |
-
-No usar logs de un CI ajeno como evidencia de ejecución propia en clase. Los resultados de verificación del repositorio se explican aparte en VERIFICACION.md.
+No usar `curl -k`, ocultar errores, editar imágenes para simular una captura ni marcar como exitoso un ensayo que no se ejecutó. No incluir `.env`, contraseñas, tokens, claves privadas ni información personal. El certificado público del laboratorio no es una credencial; su clave privada sí debe permanecer fuera de Git y del ZIP.
