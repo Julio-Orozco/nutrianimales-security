@@ -2,136 +2,177 @@
   "name": "Nutri H2 — Archivo PostgreSQL modificado",
   "nodes": [
     {
-      "id": "706f72d5-9567-5165-80bd-37728d69ba44",
-      "name": "Cada 30 segundos",
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.2,
       "parameters": {
         "rule": {
           "interval": [
             {
-              "field": "seconds",
-              "secondsInterval": 30
+              "field": "seconds"
             }
           ]
         }
       },
+      "id": "986ac818-28f8-4682-891d-0f0073be3080",
+      "name": "Cada 30 segundos",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
       "position": [
         0,
         0
       ],
-      "notes": "Agenda de la regla H2. Sondeo periódico, no detección instantánea garantizada.",
-      "notesInFlow": true
+      "notesInFlow": true,
+      "notes": "Agenda de la regla R1. Sondeo periódico, no detección instantánea garantizada."
     },
     {
-      "id": "aeae0485-6434-5f0f-a245-bfbb493c5c1f",
+      "parameters": {},
+      "id": "a6fab9c1-ea11-4df1-ba48-e8638a969547",
       "name": "Prueba manual",
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
-      "parameters": {},
       "position": [
         0,
-        240
+        272
       ],
-      "notes": "Permite ejecutar esta misma regla desde el editor durante QA.",
-      "notesInFlow": true
-    },
-    {
-      "id": "faf63580-f52c-5058-8640-8ccb1cc07c92",
-      "name": "Detectar H2",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "parameters": {
-        "method": "POST",
-        "url": "http://monitor:8000/checks/H2",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "options": {
-          "timeout": 120000
-        }
-      },
-      "position": [
-        260,
-        0
-      ],
-      "notes": "Archivo PostgreSQL modificado. Fuente: security_snapshot(). Condición: SHA-256 diferente, incluye auto.conf. Devuelve evidencia real o un error de fuente no disponible.",
       "notesInFlow": true,
-      "credentials": {
-        "httpHeaderAuth": {
-          "id": "REEMPLAZAR_AL_IMPORTAR",
-          "name": "Nutri monitor"
-        }
-      },
-      "retryOnFail": true,
-      "maxTries": 3,
-      "waitBetweenTries": 2000
+      "notes": "Permite ejecutar esta misma regla desde el editor durante QA."
     },
     {
-      "id": "e96865c4-d51e-5aa4-8884-d003cf263483",
-      "name": "Hay hallazgo",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.2,
       "parameters": {
         "conditions": {
           "options": {
-            "caseSensitive": true,
+            "caseSensitive": {},
             "leftValue": "",
-            "typeValidation": "strict",
-            "version": 2
+            "typeValidation": {},
+            "version": {}
           },
           "conditions": [
             {
-              "id": "H2",
-              "leftValue": "={{ $json.detected }}",
+              "id": "R1",
+              "leftValue": "{{ $json.archivo }}",
               "rightValue": true,
               "operator": {
-                "type": "boolean",
-                "operation": "true",
+                "type": "string",
+                "operation": "notEmpty",
                 "singleValue": true
               }
             }
           ],
           "combinator": "and"
-        }
+        },
+        "options": {}
       },
+      "id": "b9dda5c7-e4ed-4485-a0a1-9c351450da77",
+      "name": "Hay hallazgo",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
       "position": [
-        520,
+        528,
         0
       ],
-      "notes": "Solo la rama verdadera solicita notificación. Sin hallazgo no se envía Telegram.",
-      "notesInFlow": true
+      "notesInFlow": true,
+      "notes": "Solo la rama verdadera solicita notificación. Sin hallazgo no se envía Telegram."
     },
     {
-      "id": "a0efc773-3b6c-5e28-80ac-4570422ba225",
-      "name": "Notificar H2",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
       "parameters": {
-        "method": "POST",
-        "url": "=http://monitor:8000/notify/{{ $json.event_id }}",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "options": {
-          "timeout": 120000
-        }
+        "conditions": {
+          "options": {
+            "caseSensitive": {},
+            "leftValue": "",
+            "typeValidation": {},
+            "version": {}
+          },
+          "conditions": [
+            {
+              "id": "9e66e48e-16da-4756-8bbd-67d71b8ecdf1",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
       },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
       "position": [
-        800,
+        352,
+        144
+      ],
+      "id": "822a8ad3-a098-48ac-a214-8ead844f7eb5",
+      "name": "Es alerta nueva?"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH baseline(archivo, hash_esperado) AS (\n  VALUES\n    ('pg_hba.conf', '692bc916ebf65ccc8cded34937e52ba402632e78df8bba3e7d29a0102bf112e2'),\n    ('postgresql.conf', 'dde326d96dc922583a8584524422bcc4cdde3d338c929e3af56ca21ecbb585c2'),\n    ('postgresql.auto.conf', '0874e665ecf5c0a6135a73158ea1b71a959dafb809574810da5c9cc28c0c63ed')\n),\nactuales AS (\n  SELECT key AS archivo, value AS hash_actual\n  FROM jsonb_each_text(security_snapshot() -> 'hashes')\n)\nSELECT\n  a.archivo,\n  b.hash_esperado,\n  a.hash_actual\nFROM actuales a\nJOIN baseline b USING (archivo)\nWHERE a.hash_actual IS DISTINCT FROM b.hash_esperado;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        208,
         0
       ],
-      "notes": "Invoca una operación fija del monitor. La credencial se importa cifrada en n8n, nunca en este JSON. Reintenta fallos transitorios; la bandeja evita duplicados normales.",
-      "notesInFlow": true,
+      "id": "a7b20b6e-8192-4178-9f6c-810c7898a3e4",
+      "name": "Detectar H2",
+      "alwaysOutputData": true,
       "credentials": {
-        "httpHeaderAuth": {
-          "id": "REEMPLAZAR_AL_IMPORTAR",
-          "name": "Nutri monitor"
+        "postgres": {
+          "id": "1Cx22i0z55yy8wXL",
+          "name": "Nutri Postgres monitor_db"
         }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO alertas_auditoria (tipo, alerta, mensaje, detalles, severidad, huella)\nVALUES (\n  'hardening',\n  'H2',\n  'Modificación detectada en archivo crítico de PostgreSQL',\n  '{{ JSON.stringify($json) }}'::jsonb,\n  'media',\n  'H2-{{ $json.archivo }}-{{ $json.hash_actual }}'\n)\nON CONFLICT (huella) DO NOTHING\nRETURNING id;",
+        "options": {}
       },
-      "retryOnFail": true,
-      "maxTries": 3,
-      "waitBetweenTries": 2000
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        144,
+        144
+      ],
+      "id": "b8c75e55-3758-4724-995c-bcd4c4534d9c",
+      "name": "Registrar alerta H2",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "1Cx22i0z55yy8wXL",
+          "name": "Nutri Postgres monitor_db"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "-5513672600",
+        "text": "=🚨 *ALERTA H2 — Archivo PostgreSQL modificado*\n• ID evento: {{ $json.id }}\n• Archivo: `{{ $('Detectar H2').item.json.archivo }}`\n• Hash nuevo: `{{ $('Detectar H2').item.json.hash_actual }}`",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        656,
+        144
+      ],
+      "id": "5a8aead3-62cd-4d7b-b67d-30eef39bcb65",
+      "name": "Enviar alerta H2",
+      "webhookId": "9f087d2b-ec50-4e0b-a386-ab05315577ab",
+      "credentials": {
+        "telegramApi": {
+          "id": "buC8KFqNgkVUsSoI",
+          "name": "Nutri Telegram bot"
+        }
+      }
     }
   ],
+  "pinData": {},
   "connections": {
     "Cada 30 segundos": {
       "main": [
@@ -155,6 +196,28 @@
         ]
       ]
     },
+    "Hay hallazgo": {
+      "main": [
+        [
+          {
+            "node": "Registrar alerta H2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Es alerta nueva?": {
+      "main": [
+        [
+          {
+            "node": "Enviar alerta H2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Detectar H2": {
       "main": [
         [
@@ -166,21 +229,30 @@
         ]
       ]
     },
-    "Hay hallazgo": {
+    "Registrar alerta H2": {
       "main": [
         [
           {
-            "node": "Notificar H2",
+            "node": "Es alerta nueva?",
             "type": "main",
             "index": 0
           }
-        ],
-        []
+        ]
       ]
     }
   },
+  "active": false,
   "settings": {
     "executionOrder": "v1",
-    "timezone": "America/Costa_Rica"
-  }
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "c30405fd-b3e7-4b2a-8ff7-378eb0c03b29",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "e59ebbaf3db5880c93bb1012846c792a2332815d03ff00026d455885dc224d06"
+  },
+  "nodeGroups": [],
+  "id": "5ELtJHkTHF3eqQaq",
+  "tags": []
 }

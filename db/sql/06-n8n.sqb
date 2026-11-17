@@ -1,0 +1,24 @@
+-- Cuenta dedicada para las tablas internas de n8n.
+-- monitor_db queda reservado para monitoreo y no administra objetos de n8n.
+-- El script es idempotente: sirve para la inicialización limpia (00-init.sh)
+-- y para migrar una base existente (scripts/migrate-n8n-app.sh).
+SET log_statement = 'none';
+SET log_min_duration_statement = -1;
+
+SELECT format('CREATE ROLE n8n_app LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS CONNECTION LIMIT 20 PASSWORD %L', :'n8n_password')
+WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'n8n_app') \gexec
+ALTER ROLE n8n_app PASSWORD :'n8n_password';
+
+-- TypeORM (n8n) ejecuta siempre "CREATE SCHEMA IF NOT EXISTS n8n" al conectar y
+-- PostgreSQL exige el privilegio CREATE sobre la base antes de comprobar si el
+-- esquema ya existe. Sin este permiso n8n se queda bloqueado y Nginx devuelve 502.
+GRANT CONNECT, CREATE ON DATABASE nutrianimales TO n8n_app;
+
+CREATE SCHEMA IF NOT EXISTS n8n AUTHORIZATION n8n_app;
+ALTER SCHEMA n8n OWNER TO n8n_app;
+REVOKE ALL ON SCHEMA n8n FROM PUBLIC;
+ALTER ROLE n8n_app SET search_path = n8n;
+
+-- Sin acceso a los datos de negocio ni a la auditoría del esquema public.
+REVOKE ALL ON ALL TABLES IN SCHEMA public FROM n8n_app;
+REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM n8n_app;

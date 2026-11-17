@@ -1,103 +1,96 @@
-# NutriAnimales · Monitoreo, seguridad y auditoría
+# NutriAnimales S.A. — Seguridad de infraestructura y base de datos
 
-Proyecto académico BCD 9220, Lead University. Implementación para cinco integrantes basada en la guía «Sistema de Monitoreo Proactivo, Seguridad y Hardening de Base de Datos». Datos completamente ficticios.
+Proyecto académico de Seguridad de Sistemas Digitales (BCD 9220). Los datos son ficticios. Este checkout contiene Docker Compose, PostgreSQL, Nginx, pgAdmin, Filebeat y 18 definiciones JSON de flujos n8n. El proyecto **no usa Python**: la detección y las alertas se construyen con nodos de n8n que consultan PostgreSQL. No contiene el stack Logstash/Loki ni el PDF/Word del informe; por tanto, esos componentes no se declaran desplegados ni comprobados.
 
-**Empezá por este README.** Después leé [COMANDOS](docs/COMANDOS.md), [ESCENARIOS](docs/ESCENARIOS.md) y [MATRIZ DE CUMPLIMIENTO](docs/CUMPLIMIENTO.md). La [guía navegable de código](docs/GUIA_CODIGO.html) reúne fuentes numeradas y explicaciones. [CODIGO](docs/CODIGO.md) explica el propósito, funcionamiento y elección de cada módulo.
+## Requisitos
 
-## Qué incluye
+- Ubuntu/Linux con Docker Engine y Docker Compose v2.
+- OpenSSL; `sudo` solo se requiere para asignar la clave TLS de PostgreSQL al UID/GID del usuario `postgres` de la imagen.
+- Internet para descargar las imágenes la primera vez.
 
-- PostgreSQL 16 con ocho tablas empresariales, datos reproducibles, tres roles y cuenta `agente_ia` sin escritura.
-- Auditoría de INSERT/UPDATE/DELETE en cuatro tablas; usuario de sesión, IP, fecha, JSON anterior/posterior y conteo por sentencia.
-- 17 detectores R1–R5, H1–H5 y D1–D7. Cada uno tiene su propio flujo n8n y escenario de prueba.
-- Bot Telegram por polling con catálogo de consultas, resúmenes Groq y rechazo de texto fuera del catálogo. No ejecuta SQL escrito por la IA.
-- Bandeja persistente de alertas, reintentos y estado que distingue `pendiente`, `dry-run`, `fallida` y `enviada`.
-- Nginx HTTPS, CA local, SCRAM, PostgreSQL sin puerto publicado y servicios de aplicación sin root.
-- Backups cada cuatro horas, SHA-256 y prueba de restauración en otra base.
-- Objetivo SSH aislado, pgAdmin, pgbench, pgBadger y extensión Filebeat → Logstash → Loki.
-- Pruebas automáticas, CI para GitHub, reparto del trabajo, guía de exposición y plantilla de informe/evidencias.
+## Preparar y arrancar
 
-**Límites importantes:** este código no contiene capturas ni mensajes de Telegram fabricados. El Viewer nativo de n8n requiere una edición que lo incluya; el panel alternativo no acredita ese requisito sin acuerdo docente. [VERIFICACION](docs/VERIFICACION.md) distingue lo comprobado aquí de lo pendiente de ejecución.
-
-## Entorno recomendado
-
-Ubuntu 24.04 en la computadora principal o en una VM. Estimación inicial: 4 CPU, 8 GB de RAM y 30 GB libres; reservar más memoria si se usa la extensión de logs. Docker Engine y Compose **2.24.4 o superior**, Python 3.12, OpenSSL y Git. Los comandos de este README se ejecutan en **terminal de Ubuntu**, desde la carpeta del proyecto; no pegarlos directamente en PowerShell.
-
-Instalación oficial de Docker: https://docs.docker.com/engine/install/ubuntu/ . No se incluye un instalador descargado y ejecutado ciegamente como root. Si usás Windows, la opción preferida para evidenciar UFW y permisos es una VM Ubuntu; Docker Desktop permite ejecutar parte del stack, pero no convierte el firewall de Windows en UFW.
-
-No requiere VPS, IP pública, dominio ni redirección de puertos del router. Telegram y Groq requieren Internet y tus propias credenciales. Un bot dedicado evita conflictos con webhooks de otros proyectos.
-
-Si Ubuntu está en una VM, usar el navegador dentro de ella o el túnel SSH local explicado en COMANDOS. `localhost` en Windows y `localhost` dentro de la VM son equipos distintos.
-
-## Arranque
-
-### 1. Preparar secretos y certificados
+Desde la raíz del repositorio:
 
 ```bash
-python3 scripts/lab.py prepare
+bash scripts/prepare-ab.sh
+docker compose config --quiet
+docker compose up -d --wait
+docker compose ps
 ```
 
-Genera `.env` con secretos aleatorios y permisos 600, una CA privada y un certificado con SAN para `localhost`/`postgres`. No sobrescribe secretos existentes. Se prefiere generar claves diferentes por instalación a distribuir una contraseña de ejemplo compartida.
+El preparador crea `.env` con valores aleatorios solo si aún no existe, aplica modo `600` y prepara certificados locales con SAN. Nunca reemplaza el `.env` existente. No compartas `.env`, `infra/certs/server.key` ni `infra/postgres-tls/server.key`. Si la clave TLS de PostgreSQL no pertenece al UID/GID requerido, el preparador solicitará `sudo` para corregir su propietario.
 
-### 2. Levantar servicios
+La primera inicialización carga el esquema y datos ficticios desde `db/sql/`. PostgreSQL solo ejecuta esos archivos cuando su volumen de datos está vacío; reiniciar o recrear contenedores conserva la base.
+
+### Actualizar una instalación existente (corrección del 502 de n8n)
+
+Si la base ya estaba creada antes de esta revisión, n8n seguirá intentando usar `monitor_db` hasta aplicar la migración. Desde WSL, en la raíz del proyecto:
 
 ```bash
-python3 scripts/lab.py up
+bash scripts/migrate-n8n-app.sh
 ```
 
-Construye las imágenes propias y espera disponibilidad. Solo Nginx publica `127.0.0.1:8080` y `127.0.0.1:8443`. La primera descarga/construcción puede superar cinco minutos; el objetivo de arranque reproducible debe medirse con imágenes previamente descargadas. No se promete un tiempo no medido.
+El script agrega `N8N_DB_PASSWORD` a `.env` si falta (sin modificar las demás variables), crea un respaldo verificable en `.runtime/backup-<fecha>/` (dump de la base, roles sin contraseñas y volumen `n8n_data`), aplica `db/sql/06-n8n.sqb`, recrea solo el contenedor n8n y comprueba `healthz` y `https://localhost:8443/`. No ejecuta `down -v` ni borra volúmenes. El detalle del problema y la solución está en [docs/ENTREGA_REVISION2.md](docs/ENTREGA_REVISION2.md).
 
-Abrí **https://localhost:8443** y creá el propietario de n8n. Confiá en `.runtime/certs/ca.crt` en el navegador del laboratorio; es una CA local, no un certificado público. No compartás `ca.key` ni `server.key`. pgAdmin: **https://localhost:8443/pgadmin/**. Su email inicial es `ti@nutrianimales.test`; la contraseña aleatoria está en tu `.env` privado.
+## Acceso y puertos
 
-### 3. Configurar Telegram y Groq
+- n8n: <https://localhost:8443>. Verificado el 14/11/2026: `healthz` responde `ok`, la ruta raíz devuelve HTTP 200 con la interfaz de n8n y el WebSocket `/rest/push` se establece a través de Nginx. La primera visita muestra el formulario para crear la cuenta propietaria de n8n; esa cuenta la crea el equipo y no se guarda en el repositorio.
+- pgAdmin, a través del proxy Nginx: <https://localhost:8443/pgadmin/>
+- Redirección HTTP: `http://localhost:8080`
+- Solo Nginx publica puertos, ligados a `127.0.0.1`. PostgreSQL, n8n, pgAdmin y Filebeat no publican puertos al host. pgAdmin no publica `5050`.
+- El certificado es autofirmado para el laboratorio. Para una solicitud verificada desde terminal:
 
 ```bash
-python3 scripts/lab.py configure
+curl --fail --cacert infra/certs/server.crt -I https://localhost:8443/auditoria.html
 ```
 
-Pide valores sin mostrarlos. Primero ingresá el token de un bot dedicado creado con BotFather; podés dejar los chats vacíos temporalmente. Enviá `/start` al bot desde Telegram y después ejecutá:
+El navegador mostrará una advertencia hasta que confíes explícitamente en el certificado local. No uses `curl -k` como prueba de confianza.
+
+El correo inicial de pgAdmin es `ti@nutrianimales.test`; en una instalación nueva el preparador genera su contraseña. No reemplaza un `.env` preexistente. Desde pgAdmin, el servidor PostgreSQL usa el nombre DNS `postgres`, la base `nutrianimales` y credenciales definidas localmente.
+
+## Verificaciones de A y B
 
 ```bash
-python3 scripts/lab.py telegram-chats
-python3 scripts/lab.py configure --live
-docker compose up -d --no-deps --force-recreate monitor
+docker compose exec -T n8n id
+docker compose exec -T pgadmin id
+docker compose exec -T filebeat id
+stat -c '%a %n' .env infra/certs/server.key infra/postgres-tls/server.key
+git check-ignore -v .env
+docker compose exec -T postgres psql -X -U postgres -d nutrianimales -c "SHOW ssl; SHOW password_encryption; SHOW log_min_duration_statement;"
+docker compose exec -T postgres psql -X -U postgres -d nutrianimales -c "SELECT name,valor_esperado,setting,valor_esperado=setting AS coincide FROM pg_settings_baseline JOIN pg_settings USING(name) ORDER BY name;"
+bash scripts/test-init-ab.sh
 ```
 
-El primer comando muestra únicamente los identificadores de chat observados. El segundo guarda chat de alertas, chats autorizados y API key Groq, y desactiva `DRY_RUN` al tener los datos requeridos. El tercero recrea monitor para aplicar el entorno nuevo; `restart` no basta cuando cambian variables de entorno. No se borra la base.
-
-### 4. Conectar UFW
-
-El agente se ejecuta en **el Ubuntu dedicado al laboratorio**, no dentro de PostgreSQL ni en el Windows anfitrión. Primero configurá UFW según [COMANDOS](docs/COMANDOS.md). Después, desde otra terminal:
+Para las capturas de los doce controles, cada control se ejecuta con una sola orden (`A1` … `A12`, `B1` … `B4`, `N8N`):
 
 ```bash
-sudo python3 scripts/host_agent.py
+sh scripts/capturas-ab.sh A1
+sh scripts/capturas-ab.sh todo   # todos los controles seguidos
 ```
 
-Lee reglas y estado, envía hashes cada 30 segundos y nunca acepta órdenes remotas para cambiar el firewall. H1 devuelve «fuente no disponible» si este agente no está activo. La copia opcional de `ufw.log` no se inventa si Ubuntu no genera ese archivo.
-
-### 5. Importar n8n
-
-En n8n, creá una API key en Settings → n8n API y ejecutá:
+Para comprobar los conteos de las ocho tablas obligatorias:
 
 ```bash
-python3 scripts/lab.py n8n-import
+docker compose exec -T postgres psql -X -U postgres -d nutrianimales -c "SELECT 'plantas',count(*) FROM plantas UNION ALL SELECT 'productos',count(*) FROM productos UNION ALL SELECT 'materias_primas',count(*) FROM materias_primas UNION ALL SELECT 'lotes_produccion',count(*) FROM lotes_produccion UNION ALL SELECT 'clientes',count(*) FROM clientes UNION ALL SELECT 'ventas',count(*) FROM ventas UNION ALL SELECT 'control_calidad',count(*) FROM control_calidad UNION ALL SELECT 'gastos',count(*) FROM gastos;"
 ```
 
-Pide esa clave sin imprimirla, crea una credencial HTTP cifrada e importa/activa 18 flujos: 17 alertas y el bot. Conserva los IDs en runtime: si una importación se interrumpe, se puede reanudar lo registrado sin crear otra copia de esos flujos. No sobrescribe ediciones hechas en el editor. Las credenciales Telegram/Groq viven en monitor; no aparecen en los JSON ni en los nodos.
-
-### 6. Verificar y recoger evidencia
+La demostración controlada registra INSERT, UPDATE y DELETE de una fila ficticia, elimina esa fila de prueba y conserva los eventos en auditoría:
 
 ```bash
-python3 scripts/lab.py status
-python3 scripts/lab.py check all
-python3 scripts/lab.py sql-demo audit
-python3 scripts/lab.py backup
-python3 scripts/lab.py restore-test
+docker compose exec -T postgres psql -X -U postgres -d nutrianimales < db/demo-audit.sql
 ```
 
-`check all` comprueba las fuentes y condiciones actuales; **sin hallazgo no significa que el escenario de ataque se haya ejecutado**. Algunas reglas consumen eventos incrementales: si n8n los procesó antes, revisá la bandeja y la ejecución correspondiente. Guardá las capturas reales siguiendo [EVIDENCIAS](docs/EVIDENCIAS.md).
+La matriz de cumplimiento, los comandos de comprobación y los resultados de esta instalación están en [docs/CUMPLIMIENTO.md](docs/CUMPLIMIENTO.md), [docs/COMANDOS.md](docs/COMANDOS.md) y [evidencias/RESULTADOS_AB.md](evidencias/RESULTADOS_AB.md). La guía de captura distingue siempre configuración de prueba ejecutada.
 
-## Reparto y entrega
+## Alcance no incluido en este checkout
 
-[EQUIPO](docs/EQUIPO.md) reparte trabajo entre cinco; [EXPOSICION](docs/EXPOSICION.md) distribuye quince minutos. [INFORME](docs/INFORME.md) es una estructura para 15–20 páginas, que debe completarse con resultados reales. [PUBLICAR_GITHUB](docs/PUBLICAR_GITHUB.md) explica cada comando para crear el repositorio privado y subirlo.
+Los JSON de `n8n/workflows/` no se importan automáticamente y provienen de una versión anterior que llamaba a un servicio Python (`monitor`) que este proyecto no usa; los integrantes de monitoreo y bot deben adaptarlos o rehacerlos siguiendo [docs/FLUJOS_N8N.md](docs/FLUJOS_N8N.md). Tampoco se incluye una conexión Filebeat→Logstash→Loki ni el informe original adjunto. En este WSL, `/var/log/ufw.log` no es un archivo de log sino un directorio vacío creado por Docker al montar una ruta inexistente, por lo que Filebeat no recibe eventos UFW. No se debe afirmar que alertas, Telegram, monitor, ataques, backups o pruebas de otras partes están ejecutados. Para completar esas funciones se necesitan los archivos fuente y el documento oficial que no están en este espacio de trabajo.
 
-El código es una base funcional para ejecutar y revisar. No convierte escenarios no ejecutados en pruebas aprobadas ni sustituye las credenciales, evidencias y participación del grupo.
+## Detener sin borrar datos
+
+```bash
+docker compose stop
+```
+
+`docker compose down` elimina contenedores y red, pero conserva los volúmenes. No agregues `-v` salvo que quieras borrar deliberadamente la base y los datos persistidos.

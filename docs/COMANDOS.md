@@ -1,80 +1,77 @@
-# Comandos: qué hacen, para qué y por qué esta opción
+# Comandos reproducibles para A y B
 
-Contexto común: terminal de Ubuntu, carpeta raíz del repositorio. `python3` evita depender de un alias ambiguo `python`. No se necesita instalar paquetes Python en el host para el arranque básico; Docker instala las dependencias del servicio. Los pasos de desarrollo sí usan un entorno virtual.
+Ejecutar desde la raíz del proyecto. Cada control también se puede ejecutar para su captura con `sh scripts/capturas-ab.sh <A1…A12|B1…B4|N8N|todo>`. Las salidas son evidencia solo cuando se obtienen del entorno del equipo; las líneas «esperado» describen el criterio, no una prueba.
 
-## Operación habitual
+## A. Infraestructura y hardening
 
-| Comando | Qué hace / para qué | Por qué esta opción y qué revisar |
+| Control | Comando de verificación | Criterio |
 |---|---|---|
-| `python3 scripts/lab.py prepare` | Crea secretos, directorios y TLS local | Aleatoriedad criptográfica; no comparte claves de ejemplo ni sobrescribe una instalación |
-| `python3 scripts/lab.py up` | Construye y arranca con espera de salud | `--build` incorpora cambios, `-d` libera terminal, `--wait` no confunde «creado» con «disponible» |
-| `python3 scripts/lab.py configure` | Pide configuración oculta | `getpass` evita mostrar tokens en terminal o en el historial |
-| `python3 scripts/lab.py telegram-chats` | Muestra IDs de chats que escribieron al bot | Consulta la API real sin imprimir el token ni los mensajes |
-| `python3 scripts/lab.py configure --live` | Valida datos mínimos y pone DRY_RUN=false | La salida de prueba no se confunde con una alerta real enviada |
-| `docker compose up -d --no-deps --force-recreate monitor` | Aplica el nuevo .env a monitor | Recrear actualiza el entorno; `--no-deps` evita reiniciar la BD |
-| `python3 scripts/lab.py n8n-import` | Crea credencial, importa y activa flujos | API oficial; conserva JSON sin secretos e IDs privados para reanudar lo ya registrado |
-| `python3 scripts/lab.py status` | Muestra servicios y estado del monitor | Incluye modo seco y antigüedad del agente UFW |
-| `python3 scripts/lab.py check all` | Ejecuta las 17 evaluaciones actuales | Un HTTP 503 significa falta de fuente, no control aprobado |
-| `python3 scripts/lab.py check D6 --notify` | Evalúa D6 y solicita notificación si hay hallazgo nuevo | Reutiliza la misma bandeja; en modo seco no contacta Telegram |
-| `python3 scripts/lab.py backup` | Crea una copia adicional ahora | No espera al ciclo automático; valida el catálogo del dump antes de marcar ok |
-| `python3 scripts/lab.py restore-test` | Verifica hash y restaura en una base temporal | Comprueba restauración efectiva sin sobrescribir negocio; elimina solo esa base de prueba |
-| `python3 scripts/lab.py sql-demo audit` | UPDATE de una fila y consulta antes/después | Demuestra el trigger con datos reales ficticios; cambia lote 1 a «revision» |
-| `python3 scripts/lab.py sql-demo roles` | Lista roles y atributos | Complementarlo con pruebas permission denied; el listado no demuestra por sí solo acceso restringido |
-| `python3 scripts/lab.py sql-demo baseline` | Consulta referencia de configuración | Permite explicar R5/H5 al profesor |
-| `python3 scripts/lab.py sql-demo events` | Consulta eventos de seguridad recientes | Acredita bloqueos/autenticaciones y errores reales de IA |
-| `python3 scripts/lab.py groq-probe` | Hace una llamada real a Groq | Sirve para comparar clave vigente, revocada y reemplazada; no usa respuesta simulada |
-| `python3 scripts/lab.py retry-alerts` | Reintenta hasta diez alertas pendientes/fallidas | Recuperación manual tras agotar los tres reintentos del nodo; no reenvía las ya enviadas |
-| `docker compose ps` | Lista estado y mapeos de puertos | Debe verse publicación solo en Nginx; EXPOSE interno no es publicación |
-| `docker compose exec -T nginx nginx -t` | Verifica sintaxis de Nginx | `-T` desactiva TTY para una salida reproducible; no confundir con `nginx -T`, que imprime configuración |
-| `curl --fail --cacert .runtime/certs/ca.crt -I https://localhost:8443/auditoria.html` | Verifica TLS y cabeceras con HEAD | `--cacert` confía solo en nuestra CA; se evita `-k`, que ocultaría fallos de validación |
-| `docker compose logs --tail 100 monitor` | Revisa los últimos logs del servicio | Acota la salida; no imprimir .env ni tokens para diagnosticar |
-| `docker compose stop` | Detiene preservando contenedores y datos | Útil para terminar una sesión sin borrar persistencia |
-| `docker compose down` | Retira contenedores/redes, conserva volúmenes | No se incluye `-v`: ese modificador borraría datos persistentes |
+| A1. Usuarios | `docker compose exec -T n8n id`; repetir con `pgadmin` y `filebeat`; para PostgreSQL: `docker compose exec -T postgres ps -eo user,pid,args \| grep '[p]ostgres'` | n8n, pgAdmin, Filebeat y proceso PostgreSQL no ejecutan la aplicación como root. |
+| A2. `.env` | `stat -c '%a %n' .env`; `git check-ignore -v .env`; `grep -E '^[A-Z0-9_]+=' .env.example` | Modo `600`, ignorado por Git y sin valores secretos en el ejemplo. No mostrar el contenido de `.env`. |
+| A3. Red | `network=$(docker inspect --format='{{range $name, $value := .NetworkSettings.Networks}}{{$name}}{{end}}' "$(docker compose ps -q postgres)")`; después `docker network inspect "$network"` | Los servicios comparten la red bridge privada del proyecto; PostgreSQL acepta clientes únicamente desde la subred conectada y requiere TLS/SCRAM. |
+| A4. Puertos | `docker compose ps` | Solo Nginx publica `127.0.0.1:8080` y `127.0.0.1:8443`. No debe aparecer un mapeo host para 5432, 5678, 5050 ni Filebeat. |
+| A5. SCRAM | `docker compose exec -T postgres psql -X -U postgres -d nutrianimales -c "SHOW password_encryption; SELECT line_number,type,address,auth_method,error FROM pg_hba_file_rules ORDER BY line_number;"` | `scram-sha-256`; redes host usan `hostssl`/SCRAM y el resto se rechaza. `local ... trust` solo aplica al socket dentro del contenedor. |
+| A6. TLS PostgreSQL | `docker compose exec -T postgres sh -c 'PGPASSWORD="$AGENTE_IA_PASSWORD" psql "host=postgres dbname=nutrianimales user=agente_ia sslmode=verify-full sslrootcert=/run/pg-tls/server.crt" -c "SELECT ssl,version,cipher FROM pg_stat_ssl WHERE pid=pg_backend_pid();"'` | Conexión verificada por nombre, con `ssl=t` y versión/cipher TLS. |
+| A7. Solo lectura | Para cada operación, ejecutar el comando de prueba de abajo usando `INSERT`, `UPDATE` y `DELETE`. | El SELECT responde; las tres escrituras fallan con transacción de solo lectura y cero grants de escritura para agente_ia. |
+| A8. Headers | `curl --fail --cacert infra/certs/server.crt -I https://localhost:8443/auditoria.html` | Respuesta HTTPS contiene X-Frame-Options, HSTS, X-Content-Type-Options y CSP. |
+| A9. Certificado | `openssl verify -CAfile infra/certs/server.crt -verify_hostname localhost infra/certs/server.crt`; `openssl x509 -in infra/certs/server.crt -noout -dates -ext subjectAltName` | Cadena autofirmada validada explícitamente y SAN para localhost. La confianza del navegador requiere importar el certificado local. |
+| A10. Permisos | `stat -c '%a %n' .env infra/certs/server.key`; `docker compose exec -T postgres sh -c 'stat -c "%a %U %n" /var/lib/postgresql/data /var/log/postgresql /var/log/postgresql/*; find /var/lib/postgresql/data -perm /077 \| wc -l'`; `docker compose exec -T n8n stat -c '%a %U %n' /home/node/.n8n /home/node/.n8n/config` | `.env` y claves `600`; PGDATA `700` y 0 archivos permisivos; logs `600` en directorio `700`; volumen n8n `700` y `config` `600`. En una instalación nueva, aplicar una vez `docker compose exec -T n8n chmod 700 /home/node/.n8n`. |
+| A11. Logs/métricas | `docker compose exec -T postgres psql -X -U postgres -d nutrianimales -c 'SELECT pg_sleep(1.1);'`; luego `docker compose exec -T postgres sh -c 'grep pg_sleep /var/log/postgresql/postgresql-$(date -u +%F).log \| tail -1'` (con `logging_collector=on` el log no aparece en `docker compose logs`) y `docker compose exec -T postgres psql -X -U postgres -d nutrianimales -c "SELECT calls,query FROM pg_stat_statements WHERE query LIKE '%pg_sleep%' LIMIT 3;"` | El log incluye duración mayor a 1000 ms y pg_stat_statements muestra la consulta. |
+| A12. Baseline | `docker compose exec -T postgres psql -X -U postgres -d nutrianimales -c "SELECT name,valor_esperado,setting,valor_esperado=setting AS coincide FROM pg_settings_baseline JOIN pg_settings USING(name) ORDER BY name;"` | Siete filas; `coincide=t` en todas. |
 
-## Ubuntu y UFW
+Pruebas de escritura de `agente_ia` (cada comando debe fallar; no son cambios ejecutados como superusuario):
 
-Estos comandos cambian el **Ubuntu dedicado al laboratorio**. Si se administra por SSH, autorizar primero el puerto administrativo que se use realmente. En una VM manejada por consola no es necesario abrir un acceso remoto adicional.
+```bash
+docker compose exec -T postgres sh -c 'PGPASSWORD="$AGENTE_IA_PASSWORD" psql "host=postgres dbname=nutrianimales user=agente_ia sslmode=verify-full sslrootcert=/run/pg-tls/server.crt" -v ON_ERROR_STOP=1' <<'SQL'
+INSERT INTO clientes(nombre,tipo,correo,segmento) VALUES ('prueba','prueba','prueba@example.invalid','prueba');
+SQL
+docker compose exec -T postgres sh -c 'PGPASSWORD="$AGENTE_IA_PASSWORD" psql "host=postgres dbname=nutrianimales user=agente_ia sslmode=verify-full sslrootcert=/run/pg-tls/server.crt" -v ON_ERROR_STOP=1' <<'SQL'
+UPDATE clientes SET nombre=nombre WHERE id=1;
+SQL
+docker compose exec -T postgres sh -c 'PGPASSWORD="$AGENTE_IA_PASSWORD" psql "host=postgres dbname=nutrianimales user=agente_ia sslmode=verify-full sslrootcert=/run/pg-tls/server.crt" -v ON_ERROR_STOP=1' <<'SQL'
+DELETE FROM clientes WHERE id=1;
+SQL
+```
 
-| Comando | Qué hace / para qué | Por qué |
-|---|---|---|
-| `sudo apt update` | Actualiza el índice de paquetes Ubuntu | Permite instalar desde el estado actual del repositorio oficial |
-| `sudo apt install -y python3 openssl git ufw rsyslog` | Instala utilidades de host y registros | Son herramientas del laboratorio; no reemplaza la instalación oficial de Docker/Compose |
-| `sudo ufw default deny incoming` | Niega entrada por defecto | Solo se abren excepciones justificadas |
-| `sudo ufw default allow outgoing` | Permite conexiones salientes | Telegram/Groq requieren salida; no implica permitir entrada a PostgreSQL |
-| `sudo ufw allow 22/tcp` | Autoriza SSH administrativo si se usa puerto 22 | Condicional: adaptar al puerto real o no ejecutar si no se usa SSH remoto |
-| `sudo ufw logging low` | Activa logs básicos de tráfico UFW | Reduce ruido respecto de un nivel detallado; un cambio de regla no equivale a un paquete bloqueado |
-| `sudo ufw enable` | Activa las reglas anteriores | Hacerlo desde consola del laboratorio o tras autorizar el acceso administrativo |
-| `sudo ufw status verbose` | Comprueba políticas y reglas | Es evidencia del estado, no de que los puertos Docker estén protegidos por UFW |
-| `sudo python3 scripts/host_agent.py` | Observa UFW cada 30 s y envía hashes por HTTPS local | Solo este observador necesita root; monitor/n8n no reciben privilegios del host |
-| `sudo python3 scripts/host_agent.py --once` | Envía una observación | Diagnóstico puntual; no mantiene H1 actualizado por más de 90 s |
-| `sudo ufw allow 5432/tcp` | Modifica una regla para A3/H1 | Ensayo real de cambio de configuración; no publica por sí solo PostgreSQL |
-| `sudo ufw delete allow 5432/tcp` | Retira esa regla después del ensayo | Revierte la excepción, siempre comprobando que corresponde al laboratorio |
+Para comprobar la respuesta esperada sin alterar la terminal tras cada error, se pueden ejecutar individualmente como `if comando; then echo FALLO; else echo DENEGADO; fi`.
 
-## Desarrollo, herramientas y CI
+## B. Base de datos y auditoría
 
-| Comando | Qué hace / para qué | Por qué |
-|---|---|---|
-| `python3 -m venv .venv` | Crea un entorno Python local | Separa dependencias del sistema Ubuntu |
-| `.venv/bin/python -m pip install -r requirements-dev.txt` | Instala dependencias directas versionadas y pruebas | El ejecutable explicita el entorno; no necesita activarlo con source |
-| `.venv/bin/python -m pytest tests -q` | Ejecuta pruebas unitarias y de contratos | `-q` reduce ruido; no acredita conexiones externas ni arranque Docker |
-| `.venv/bin/python scripts/generate_workflows.py` | Regenera los 18 JSON | Una sola definición evita divergencias; los JSON existentes permiten arrancar sin este paso |
-| `.venv/bin/python scripts/explain_sources.py` | Regenera la guía HTML con fuentes y explicaciones | Mantiene números de línea consistentes después de editar |
-| `python3 scripts/package.py` | Empaqueta fuentes que Git sigue y agrega hashes | Excluye datos privados y rechaza claves/secretos conocidos del entorno. Ejecutar después de git add; el ZIP queda fuera del repositorio |
-| `docker compose config --quiet` | Valida Compose e interpolación | Detecta estructura inválida antes de crear servicios; no prueba que las imágenes arranquen |
-| `docker compose --profile qa run --rm tester pgbench` | Ejecuta una carga de lectura de 20 s | No usa pgbench -i, que crearía tablas ajenas al modelo; no pretende ser un benchmark de producción |
-| `docker compose --profile qa run --rm tester pgbadger` | Analiza CSV PostgreSQL reales | Produce `.runtime/reports/pgbadger.html`; no utiliza logs inventados |
-| `docker compose -f compose.yaml -f compose.logging.yaml up -d --build` | Integra Filebeat, Logstash y Loki | El segundo archivo es una extensión explícita; Logstash adapta Beats al protocolo Loki |
-| `docker compose -f compose.yaml -f compose.logging.yaml logs --tail 100 logstash filebeat loki` | Revisa la cadena de registros | Detectar errores antes de declarar que la integración funciona |
-| `docker compose exec -T postgres psql -U postgres -d nutrianimales -v ON_ERROR_STOP=1 < tests/sql-invariants.sql` | Ejecuta invariantes en laboratorio nuevo | Falla ante error y revierte sus cambios de prueba; no ejecutar en producción |
+Conteos de datos de prueba:
 
-## Qué ejecutan internamente los scripts
+```bash
+docker compose exec -T postgres psql -X -U postgres -d nutrianimales -P pager=off -c "SELECT 'plantas',count(*) FROM plantas UNION ALL SELECT 'productos',count(*) FROM productos UNION ALL SELECT 'materias_primas',count(*) FROM materias_primas UNION ALL SELECT 'lotes_produccion',count(*) FROM lotes_produccion UNION ALL SELECT 'clientes',count(*) FROM clientes UNION ALL SELECT 'ventas',count(*) FROM ventas UNION ALL SELECT 'control_calidad',count(*) FROM control_calidad UNION ALL SELECT 'gastos',count(*) FROM gastos;"
+```
 
-Acceso opcional desde Windows al Ubuntu de la VM: `ssh -N -L 8443:127.0.0.1:8443 -L 8080:127.0.0.1:8080 USUARIO_UBUNTU@IP_VM`. Sustituir usuario/IP por los reales del laboratorio. `-N` mantiene solo el túnel, y cada `-L` reenvía un puerto local al loopback de Ubuntu. Mantener esa terminal abierta y visitar localhost en Windows. No abre PostgreSQL ni requiere redirección en el router. Se necesita SSH administrativo de la VM configurado, independiente de ssh-lab:2222. Alternativa más simple: navegador dentro de Ubuntu Desktop.
+El esquema tiene 14 tablas (ocho empresariales y seis de auditoría/monitoreo), tres vistas de reporte, claves primarias y foráneas. Listados útiles:
 
-`openssl req -x509 -newkey rsa:2048 -sha256 -nodes -days 365`: crea la CA local; RSA 2048 prioriza compatibilidad del laboratorio, SHA-256 firma y `-nodes` permite arranque sin pedir una frase. **La protección de la clave está en permisos 600 y directorio privado**, no en cifrado de archivo. El certificado de servidor se firma por 30 días y lleva SAN; un CN solo no basta para validar nombres modernos.
+```bash
+bash scripts/test-init-ab.sh
+docker compose exec -T postgres psql -X -U postgres -d nutrianimales -c '\dt'
+docker compose exec -T postgres psql -X -U postgres -d nutrianimales -c "SELECT event_object_table,trigger_name,event_manipulation FROM information_schema.triggers WHERE trigger_schema='public' ORDER BY 1,2,3;"
+docker compose exec -T postgres psql -X -U postgres -d nutrianimales -c '\d auditoria_datos'
+```
 
-`psql -v ON_ERROR_STOP=1 -v nombre=valor`: detiene errores y enlaza literales con `:'nombre'`; se evita concatenar contraseñas sin escape. La sesión desactiva logs de instrucciones al crear los usuarios. `pg_dump --format=custom --no-owner --no-privileges`: archivo restaurable y portable; **no conserva por sí solo las cuentas/ACL del clúster**. `pg_restore --list` valida catálogo, mientras `restore-test` efectúa la restauración. `sha256sum` detecta cambios en los bytes, pero no autentica contra un atacante que pueda cambiar también el manifiesto.
+Demostración repetible y segura de INSERT/UPDATE/DELETE:
 
-`sshpass` usa exclusivamente una contraseña **falsa** para veinte intentos limitados contra `ssh-lab:2222`. `ssh-keyscan` recoge la clave del servicio interno y luego se exige esa clave; no es verificación fuera de banda resistente a un atacante que ya controle esa red. `SET statement_timeout` se amplía solo en la sesión QA que mantiene conexiones para R2/H4, no para el bot.
+```bash
+docker compose exec -T postgres psql -X -U postgres -d nutrianimales < db/demo-audit.sql
+```
 
-`SET SESSION AUTHORIZATION`, `SET ROLE`, `GRANT`, `REVOKE`, `ALTER SYSTEM`, `pg_reload_conf()` y las sentencias de cada escenario se explican en [CODIGO](CODIGO.md) y [ESCENARIOS](ESCENARIOS.md). Los comandos Git/GitHub se explican individualmente en [PUBLICAR_GITHUB](PUBLICAR_GITHUB.md). Las opciones de archivos de configuración y cada línea de las fuentes se pueden consultar en la guía HTML.
+Inserta una fila ficticia, actualiza y elimina esa misma fila en una transacción confirmada: el registro empresarial queda eliminado y las tres auditorías persisten. El resultado debe mostrar usuario, operación, `fila_id`, JSON anterior y posterior; en DELETE `valor_nuevo_es_null=t`.
+
+## n8n (revisión 2)
+
+```bash
+docker compose exec -T n8n wget -qO- http://127.0.0.1:5678/healthz
+curl --fail -s --cacert infra/certs/server.crt -o /dev/null -w '%{http_code}\n' https://localhost:8443/
+docker compose exec -T postgres psql -X -U postgres -d nutrianimales -c "SELECT pg_get_userbyid(nspowner) AS owner, (SELECT count(*) FROM pg_tables WHERE schemaname='n8n') AS tablas FROM pg_namespace WHERE nspname='n8n';"
+docker compose exec -T postgres psql -X -U postgres -d nutrianimales -c "SELECT has_schema_privilege('n8n_app','n8n','USAGE') AS usage, has_schema_privilege('n8n_app','n8n','CREATE') AS create, has_schema_privilege('monitor_db','n8n','CREATE') AS monitor_create;"
+docker compose exec -T postgres psql -X -U postgres -d nutrianimales -c "SELECT usename, ssl, version FROM pg_stat_activity JOIN pg_stat_ssl USING(pid) WHERE usename='n8n_app';"
+```
+
+Esperado: `{"status":"ok"}`, `200`, owner `n8n_app` con más de 100 tablas, `usage=t create=t monitor_create=f` y sesiones `ssl=t TLSv1.3`. Si devuelve 502 en una instalación previa, ejecutar `bash scripts/migrate-n8n-app.sh`.
+
+## Guardado de evidencia
+
+Guardar comandos y salidas auténticas sin copiar `.env`, valores de credenciales, claves privadas ni datos personales. Si un comando no se ejecutó en la computadora de exposición, marcar la evidencia pendiente. Para detener el laboratorio sin borrar datos: `docker compose stop`. No usar `down -v` para una demostración.
